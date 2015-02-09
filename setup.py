@@ -16,8 +16,9 @@ setup(name=pkgname,
       zip_safe=True,
       install_requires=[
           "setuptools",
+          "mock",
           "vdt.version",
           "vdt.versionplugin.default",
       ],
       entry_points={},
-)
+      )
