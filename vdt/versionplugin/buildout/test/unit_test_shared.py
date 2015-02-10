@@ -31,20 +31,19 @@ def test_build_dependent_packages():
             patch('vdt.versionplugin.buildout.shared.pip') as mock_pip,\
             patch('vdt.versionplugin.buildout.shared.fpm_command') as mock_fpm,\
             patch('vdt.versionplugin.buildout.shared.shutil') as mock_shutil,\
-            patch('vdt.versionplugin.buildout.shared.subprocess') as mock_subprocess,\
-            patch('vdt.versionplugin.buildout.shared.os') as mock_os:
+            patch('vdt.versionplugin.buildout.shared.subprocess') as mock_subprocess:
 
             mock_temp.mkdtemp.return_value = '/home/test/'
-            mock_os.listdir.return_value = ['test-1', 'test-2', 'test-3']
             mock_fpm.return_value = 'fpm -s python -t deb'
 
-            build_dependent_packages()
+            build_dependent_packages({'pyyaml': '1.0.0', 'puka': None})
 
-            mock_pip.main.assert_called_once_with(['install', '--upgrade', '--ignore-installed',
-                                                   '--no-install',
-                                                   '--build=' + mock_temp.mkdtemp.return_value,
-                                                   '--editable', '.'])
-            calls = [call(mock_fpm.return_value) for _ in mock_os.listdir.return_value]
+            calls = [call(['install', 'puka', '--ignore-installed', '--no-install',
+                           '--build=' + mock_temp.mkdtemp.return_value]),
+                     call(['install', 'pyyaml==1.0.0', '--ignore-installed', '--no-install',
+                           '--build=' + mock_temp.mkdtemp.return_value])]
+            mock_pip.main.assert_has_calls(calls)
+            calls = [call('fpm -s python -t deb'), call('fpm -s python -t deb')]
             mock_subprocess.check_output.assert_has_calls(calls)
             mock_shutil.rmtree.assert_called_once_with(mock_temp.mkdtemp.return_value)
 
@@ -59,7 +58,7 @@ def test_build_dependent_packages_exception():
             mock_pip.main.side_effect = Exception('Boom!')
 
             with pytest.raises(Exception):
-                build_dependent_packages()
+                build_dependent_packages({'test': 'test'})
 
             mock_shutil.rmtree.assert_called_once_with(mock_temp.mkdtemp.return_value)
 

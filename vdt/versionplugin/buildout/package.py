@@ -31,7 +31,7 @@ def build_package(version):
 
         log.debug("Running command {0}".format(" ".join(fpm_cmd)))
         log.debug(subprocess.check_output(fpm_cmd))
-        build_dependent_packages()
+        build_dependent_packages(dependencies_with_versions)
 
     return 0
 

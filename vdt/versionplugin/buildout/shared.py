@@ -17,13 +17,19 @@ broken_scheme_names = {'pyyaml': 'yaml',
                        'pyzmq': 'zmq'}
 
 
-def build_dependent_packages():
+def build_dependent_packages(dependencies_with_versions):
     log.debug(">> Building dependent packages:")
     tmp_dir = tempfile.mkdtemp()
     try:
-        pip.main(['install', '--upgrade', '--ignore-installed', '--no-install', '--build=' + tmp_dir, '--editable', '.'])
-        for pkg_name in os.listdir(tmp_dir):
-            fpm_cmd = fpm_command(pkg_name, os.path.join(tmp_dir, pkg_name, 'setup.py'))
+        for dependency, version in dependencies_with_versions.iteritems():
+            if version:
+                pkg = dependency + '==' + version
+            else:
+                pkg = dependency
+            pip.main(['install', pkg, '--ignore-installed', '--no-install',
+                      '--build=' + tmp_dir])
+
+            fpm_cmd = fpm_command(dependency, os.path.join(tmp_dir, dependency, 'setup.py'))
 
             log.debug("Running command {0}".format(" ".join(fpm_cmd)))
             log.debug(subprocess.check_output(fpm_cmd))
