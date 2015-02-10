@@ -9,4 +9,3 @@ else
 		rm -f "${file}"[co] >/dev/null
   	done
 fi
-EOF
