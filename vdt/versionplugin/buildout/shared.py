@@ -21,7 +21,8 @@ def build_dependent_packages():
     log.debug(">> Building dependent packages:")
     tmp_dir = tempfile.mkdtemp()
     try:
-        pip.main(['install', '--upgrade', '--no-install', '--build=' + tmp_dir, '--editable', '.'])
+        pip.main(['install', '--upgrade', '--ignore-installed', '--no-install',
+                  '--build=' + tmp_dir, '--editable', '.'])
         for pkg_name in os.listdir(tmp_dir):
             fpm_cmd = fpm_command(pkg_name, os.path.join(tmp_dir, pkg_name, 'setup.py'))
 

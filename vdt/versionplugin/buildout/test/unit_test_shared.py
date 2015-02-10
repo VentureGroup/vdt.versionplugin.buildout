@@ -40,7 +40,8 @@ def test_build_dependent_packages():
 
             build_dependent_packages()
 
-            mock_pip.main.assert_called_once_with(['install', '--upgrade', '--no-install',
+            mock_pip.main.assert_called_once_with(['install', '--upgrade', '--ignore-installed',
+                                                   '--no-install',
                                                    '--build=' + mock_temp.mkdtemp.return_value,
                                                    '--editable', '.'])
             calls = [call(mock_fpm.return_value) for _ in mock_os.listdir.return_value]
