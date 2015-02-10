@@ -113,6 +113,19 @@ def test_fpm_command_broken_scheme():
                            '--before-remove=files/preremove', './home/test/setup.py']
 
 
+def test_fpm_command_version():
+    with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
+        mock_os_path.join.return_value = 'files/preremove'
+        expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb',
+                           '--version=1.2.0-jenkins-704', '--maintainer=CSI', '--exclude=*.pyc',
+                           '--exclude=*.pyo', '--depends=python', '--category=python',
+                           '--template-scripts',
+                           '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                           '--before-remove=files/preremove', './home/test/setup.py']
+        result = fpm_command('pyyaml', './home/test/setup.py', version='1.2.0-jenkins-704')
+        assert sorted(result) == sorted(expected_result)
+
+
 def test_read_dependencies():
     with patch('vdt.versionplugin.buildout.shared.log'):
             file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/setup.py')

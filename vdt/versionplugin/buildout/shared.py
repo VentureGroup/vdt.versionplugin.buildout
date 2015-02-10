@@ -21,8 +21,7 @@ def build_dependent_packages():
     log.debug(">> Building dependent packages:")
     tmp_dir = tempfile.mkdtemp()
     try:
-        pip.main(['install', '--upgrade', '--ignore-installed', '--no-install',
-                  '--build=' + tmp_dir, '--editable', '.'])
+        pip.main(['install', '--upgrade', '--ignore-installed', '--no-install', '--build=' + tmp_dir, '--editable', '.'])
         for pkg_name in os.listdir(tmp_dir):
             fpm_cmd = fpm_command(pkg_name, os.path.join(tmp_dir, pkg_name, 'setup.py'))
 
@@ -32,10 +31,13 @@ def build_dependent_packages():
         shutil.rmtree(tmp_dir)
 
 
-def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=None):
+def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=None, version=None):
     fpm_cmd = ['fpm']
     if pkg_name.lower() in broken_scheme_names:
         fpm_cmd += ['-n', 'python-' + broken_scheme_names[pkg_name.lower()]]
+
+    if version:
+        fpm_cmd += ['--version=%s' % version]
 
     pre_remove_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/preremove')
     fpm_cmd += ['-s', 'python', '-t', 'deb', '--maintainer=CSI', '--exclude=*.pyc',

@@ -27,7 +27,7 @@ def build_package(version):
               "vdt.versionplugin.buildout".format(os.path.basename(os.getcwd()), version))
     with version.checkout_tag:
         fpm_cmd = fpm_command(os.path.basename(os.getcwd()), 'setup.py',
-                              no_python_dependencies=True, extra_args=extra_args)
+                              no_python_dependencies=True, extra_args=extra_args, version=version)
 
         log.debug("Running command {0}".format(" ".join(fpm_cmd)))
         log.debug(subprocess.check_output(fpm_cmd))
