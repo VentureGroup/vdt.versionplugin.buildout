@@ -59,11 +59,11 @@ def delete_old_packages():
         os.remove(package)
 
 
-def read_dependencies():
+def read_dependencies(file_name='setup.py'):
     dependencies = []
     log.debug(">> Reading dependencies:")
     with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages') as _:
-        imp.load_source('setup', 'setup.py')
+        imp.load_source('setup', file_name)
 
         for dependency in setup_mock.call_args[1]['install_requires']:
             dependencies.append(string.lower(dependency))
