@@ -31,10 +31,12 @@ def test_build_dependent_packages():
             patch('vdt.versionplugin.buildout.shared.pip') as mock_pip,\
             patch('vdt.versionplugin.buildout.shared.fpm_command') as mock_fpm,\
             patch('vdt.versionplugin.buildout.shared.shutil') as mock_shutil,\
-            patch('vdt.versionplugin.buildout.shared.subprocess') as mock_subprocess:
+            patch('vdt.versionplugin.buildout.shared.subprocess') as mock_subprocess,\
+            patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
 
             mock_temp.mkdtemp.return_value = '/home/test/'
             mock_fpm.return_value = 'fpm -s python -t deb'
+            mock_os_path.exists.return_value = True
 
             build_dependent_packages({'pyyaml': '1.0.0', 'puka': None})
 

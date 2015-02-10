@@ -29,10 +29,10 @@ def build_dependent_packages(dependencies_with_versions):
             pip.main(['install', pkg, '--ignore-installed', '--no-install',
                       '--build=' + tmp_dir])
 
-            fpm_cmd = fpm_command(dependency, os.path.join(tmp_dir, dependency, 'setup.py'))
-
-            log.debug("Running command {0}".format(" ".join(fpm_cmd)))
-            log.debug(subprocess.check_output(fpm_cmd))
+            if os.path.exists(os.path.join(tmp_dir, dependency, 'setup.py')):
+                fpm_cmd = fpm_command(dependency, os.path.join(tmp_dir, dependency, 'setup.py'))
+                log.debug("Running command {0}".format(" ".join(fpm_cmd)))
+                log.debug(subprocess.check_output(fpm_cmd))
     finally:
         shutil.rmtree(tmp_dir)
 
