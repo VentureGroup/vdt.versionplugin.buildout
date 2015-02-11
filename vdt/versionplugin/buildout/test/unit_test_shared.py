@@ -145,8 +145,8 @@ def test_extend_extra_args_with_versions():
         extra_args = ['--test-1', '--test-2']
         dependencies_with_versions = {'setuptools': '1.0.0', 'puka': '2.0.0'}
         expected_result = sorted(['--test-1', '--test-2',
-                                  '-d', '"python-setuptools = 1.0.0"',
-                                  '-d', '"python-puka = 2.0.0"'])
+                                  '-d', 'python-setuptools = 1.0.0',
+                                  '-d', 'python-puka = 2.0.0'])
         result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
 
         assert result == expected_result
@@ -170,7 +170,7 @@ def test_extend_extra_args_broken_scheme():
         dependencies_with_versions = {'pyyaml': None, 'pyzmq': '1.0.0'}
         expected_result = sorted(['--test-1', '--test-2',
                                   '-d', 'python-yaml',
-                                  '-d', '"python-zmq = 1.0.0"'])
+                                  '-d', 'python-zmq = 1.0.0'])
         result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
 
         assert result == expected_result

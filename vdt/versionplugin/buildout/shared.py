@@ -87,7 +87,7 @@ def extend_extra_args(extra_args, dependencies_with_versions):
             pkg_name = broken_scheme_names[pkg_name]
 
         if version:
-            arg = '"python-' + pkg_name + " = " + version + '"'
+            arg = 'python-' + pkg_name + ' = ' + version
         else:
             arg = 'python-' + pkg_name
         extra_args.append('-d')
