@@ -46,7 +46,7 @@ def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=Non
         fpm_cmd += ['--version=%s' % version]
 
     pre_remove_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/preremove')
-    fpm_cmd += ['-s', 'python', '-t', 'deb', '--maintainer=CSI', '--exclude=*.pyc',
+    fpm_cmd += ['-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI', '--exclude=*.pyc',
                 '--exclude=*.pyo', '--depends=python', '--category=python',
                 '--template-scripts', '--python-install-lib=/usr/lib/python2.7/dist-packages/',
                 '--python-install-bin=/usr/local/bin/', '--before-remove=' + pre_remove_script]

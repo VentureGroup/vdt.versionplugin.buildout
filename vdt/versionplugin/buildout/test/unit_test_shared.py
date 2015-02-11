@@ -71,7 +71,7 @@ def test_fpm_command_dependencies_and_extra_args():
         fpm_ret = fpm_command('test', './home/test/setup.py',
                               no_python_dependencies=True,
                               extra_args=['-d', 'test'])
-        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '--maintainer=CSI',
+        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
                            '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
@@ -85,7 +85,7 @@ def test_fpm_command_dependencies_and_no_extra_args():
         mock_os_path.join.return_value = 'files/preremove'
         fpm_ret = fpm_command('test', './home/test/setup.py',
                               no_python_dependencies=True)
-        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '--maintainer=CSI',
+        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
                            '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
@@ -98,7 +98,7 @@ def test_fpm_command_no_dependencies_and_no_extra_args():
     with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
         mock_os_path.join.return_value = 'files/preremove'
         fpm_ret = fpm_command('test', './home/test/setup.py')
-        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '--maintainer=CSI',
+        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
                            '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
@@ -110,7 +110,7 @@ def test_fpm_command_broken_scheme():
     with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
         mock_os_path.join.return_value = 'files/preremove'
         fpm_ret = fpm_command('pyyaml', './home/test/setup.py')
-        assert fpm_ret == ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb',
+        assert fpm_ret == ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
                            '--maintainer=CSI', '--exclude=*.pyc', '--exclude=*.pyo',
                            '--depends=python', '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
@@ -121,7 +121,7 @@ def test_fpm_command_broken_scheme():
 def test_fpm_command_version():
     with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
         mock_os_path.join.return_value = 'files/preremove'
-        expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb',
+        expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
                            '--version=1.2.0-jenkins-704', '--maintainer=CSI', '--exclude=*.pyc',
                            '--exclude=*.pyo', '--depends=python', '--category=python',
                            '--template-scripts',
