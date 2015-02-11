@@ -14,7 +14,8 @@ from mock import patch
 log = logging.getLogger('vdt.versionplugin.buildout.package')
 
 broken_scheme_names = {'pyyaml': 'yaml',
-                       'pyzmq': 'zmq'}
+                       'pyzmq': 'zmq',
+                       'pycrypto': 'crypto'}
 
 
 def build_dependent_packages(dependencies_with_versions):
