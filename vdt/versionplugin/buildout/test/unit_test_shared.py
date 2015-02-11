@@ -75,6 +75,7 @@ def test_fpm_command_dependencies_and_extra_args():
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
                            '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                           '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', '--no-python-dependencies',
                            '-d', 'test', './home/test/setup.py']
 
@@ -88,6 +89,7 @@ def test_fpm_command_dependencies_and_no_extra_args():
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
                            '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                           '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', '--no-python-dependencies',
                            './home/test/setup.py']
 
@@ -100,6 +102,7 @@ def test_fpm_command_no_dependencies_and_no_extra_args():
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
                            '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                           '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', './home/test/setup.py']
 
 
@@ -111,6 +114,7 @@ def test_fpm_command_broken_scheme():
                            '--maintainer=CSI', '--exclude=*.pyc', '--exclude=*.pyo',
                            '--depends=python', '--category=python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                           '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', './home/test/setup.py']
 
 
@@ -122,6 +126,7 @@ def test_fpm_command_version():
                            '--exclude=*.pyo', '--depends=python', '--category=python',
                            '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                           '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', './home/test/setup.py']
         result = fpm_command('pyyaml', './home/test/setup.py', version='1.2.0-jenkins-704')
         assert sorted(result) == sorted(expected_result)
