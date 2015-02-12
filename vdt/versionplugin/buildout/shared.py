@@ -35,7 +35,7 @@ def build_dependent_packages(deps_with_versions, versions_file):
                 pkg = dependency + '==' + version
             else:
                 pkg = dependency
-            pip.main(['install', pkg, '--ignore-installed', '--no-install',
+            pip.main(['install', '-q', pkg, '--ignore-installed', '--no-install',
                       '--build=' + tmp_dir])
 
             setup_py = os.path.join(tmp_dir, dependency, 'setup.py')
@@ -85,7 +85,7 @@ def delete_old_packages():
 
 
 def read_dependencies(file_name):
-    log.debug(">> Reading dependencies:")
+    log.debug(">> Reading dependencies from %s:" % file_name)
     with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages') as _:
         _load_module(file_name)
         dependencies = _strip_dependencies(setup_mock)
