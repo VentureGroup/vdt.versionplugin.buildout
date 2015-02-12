@@ -6,9 +6,9 @@ from vdt.versionplugin.buildout.shared import parse_version_extra_args
 from vdt.versionplugin.buildout.shared import read_dependencies
 from vdt.versionplugin.buildout.shared import lookup_versions
 from vdt.versionplugin.buildout.shared import extend_extra_args
-from vdt.versionplugin.buildout.shared import build_dependent_packages
 from vdt.versionplugin.buildout.shared import fpm_command
 from vdt.versionplugin.buildout.shared import delete_old_packages
+from vdt.versionplugin.buildout.shared import traverse_dependencies
 
 log = logging.getLogger('vdt.versionplugin.buildout.package')
 
@@ -17,11 +17,12 @@ def build_package(version):
     """
     Build package with debianize.
     """
-    args, extra_args = parse_version_extra_args(version.extra_args)
-    dependencies = read_dependencies()
-    dependencies_with_versions = lookup_versions(dependencies, args.versions_file)
-    extra_args = extend_extra_args(extra_args, dependencies_with_versions)
     delete_old_packages()
+    args, extra_args = parse_version_extra_args(version.extra_args)
+    deps = read_dependencies(os.path.join(os.getcwd(), 'setup.py'))
+    deps_with_versions = lookup_versions(deps, args.versions_file)
+    traverse_dependencies(deps_with_versions, args.versions_file)
+    extra_args = extend_extra_args(extra_args, deps_with_versions)
 
     log.debug("Building {0} version {1} with "
               "vdt.versionplugin.buildout".format(os.path.basename(os.getcwd()), version))
@@ -31,7 +32,6 @@ def build_package(version):
 
         log.debug("Running command {0}".format(" ".join(fpm_cmd)))
         log.debug(subprocess.check_output(fpm_cmd))
-        build_dependent_packages(dependencies_with_versions)
 
     return 0
 

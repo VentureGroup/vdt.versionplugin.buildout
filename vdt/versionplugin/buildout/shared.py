@@ -1,5 +1,4 @@
 import os
-import string
 import argparse
 import ConfigParser
 import imp
@@ -10,6 +9,7 @@ import pip
 import subprocess
 import glob
 from mock import patch
+import sys
 
 log = logging.getLogger('vdt.versionplugin.buildout.package')
 
@@ -18,11 +18,19 @@ broken_scheme_names = {'pyyaml': 'yaml',
                        'pycrypto': 'crypto'}
 
 
-def build_dependent_packages(dependencies_with_versions):
+def traverse_dependencies(deps_with_versions, versions_file):
+    nested_deps_with_version = build_dependent_packages(deps_with_versions, versions_file)
+
+    if nested_deps_with_version:
+        traverse_dependencies(nested_deps_with_version, versions_file)
+
+
+def build_dependent_packages(deps_with_versions, versions_file):
     log.debug(">> Building dependent packages:")
     tmp_dir = tempfile.mkdtemp()
+    nested_deps_with_version = {}
     try:
-        for dependency, version in dependencies_with_versions.iteritems():
+        for dependency, version in deps_with_versions.iteritems():
             if version:
                 pkg = dependency + '==' + version
             else:
@@ -30,12 +38,18 @@ def build_dependent_packages(dependencies_with_versions):
             pip.main(['install', pkg, '--ignore-installed', '--no-install',
                       '--build=' + tmp_dir])
 
-            if os.path.exists(os.path.join(tmp_dir, dependency, 'setup.py')):
-                fpm_cmd = fpm_command(dependency, os.path.join(tmp_dir, dependency, 'setup.py'))
+            setup_py = os.path.join(tmp_dir, dependency, 'setup.py')
+            if os.path.exists(setup_py):
+                dependencies = read_dependencies(setup_py)
+                nested_deps_with_version.update(lookup_versions(dependencies, versions_file))
+                extra_args = extend_extra_args([], nested_deps_with_version)
+                fpm_cmd = fpm_command(dependency, setup_py, no_python_dependencies=True,
+                                      extra_args=extra_args)
                 log.debug("Running command {0}".format(" ".join(fpm_cmd)))
                 log.debug(subprocess.check_output(fpm_cmd))
     finally:
         shutil.rmtree(tmp_dir)
+    return nested_deps_with_version
 
 
 def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=None, version=None):
@@ -69,16 +83,42 @@ def delete_old_packages():
         os.remove(package)
 
 
-def read_dependencies(file_name='setup.py'):
-    dependencies = []
+def read_dependencies(file_name):
     log.debug(">> Reading dependencies:")
     with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages') as _:
-        imp.load_source('setup', file_name)
+        _load_module(file_name)
+        dependencies = _strip_dependencies(setup_mock)
 
-        for dependency in setup_mock.call_args[1]['install_requires']:
-            dependencies.append(string.lower(dependency))
     log.debug(dependencies)
     return dependencies
+
+
+def _strip_dependencies(setup_mock):
+    try:
+        dependencies = []
+        for dep in setup_mock.call_args[1]['install_requires']:
+            dep = dep.split('==')[0].split('<=')[0].split('>=')[0].split('!=')[0]
+            dep = dep.strip().lower()
+            dependencies.append(dep)
+    except:
+        # we are only interested in ['install_requires']
+        pass
+    return dependencies
+
+
+def _load_module(file_name):
+    # in order to load setup.py we need to change working dir and add it to sys path
+    old_wd = os.getcwd()
+    new_wd = os.path.dirname(file_name)
+    os.chdir(new_wd)
+    sys.path.insert(0, new_wd)
+    try:
+        imp.load_source('setup', file_name)
+    except SystemExit:
+        # make sure nobody kills the package builder
+        pass
+    finally:
+        os.chdir(old_wd)
 
 
 def extend_extra_args(extra_args, dependencies_with_versions):
