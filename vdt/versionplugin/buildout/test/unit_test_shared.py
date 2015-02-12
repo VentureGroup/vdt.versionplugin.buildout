@@ -89,7 +89,8 @@ def test_fpm_command_dependencies_and_extra_args():
                               extra_args=['-d', 'test'])
         assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
-                           '--category=python', '--template-scripts',
+                           '--category=python', '--python-bin=/usr/bin/python',
+                           '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
                            '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', '--no-python-dependencies',
@@ -103,7 +104,8 @@ def test_fpm_command_dependencies_and_no_extra_args():
                               no_python_dependencies=True)
         assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
-                           '--category=python', '--template-scripts',
+                           '--category=python', '--python-bin=/usr/bin/python',
+                           '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
                            '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', '--no-python-dependencies',
@@ -116,7 +118,8 @@ def test_fpm_command_no_dependencies_and_no_extra_args():
         fpm_ret = fpm_command('test', './home/test/setup.py')
         assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
                            '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
-                           '--category=python', '--template-scripts',
+                           '--category=python', '--python-bin=/usr/bin/python',
+                           '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
                            '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', './home/test/setup.py']
@@ -128,7 +131,8 @@ def test_fpm_command_broken_scheme():
         fpm_ret = fpm_command('pyyaml', './home/test/setup.py')
         assert fpm_ret == ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
                            '--maintainer=CSI', '--exclude=*.pyc', '--exclude=*.pyo',
-                           '--depends=python', '--category=python', '--template-scripts',
+                           '--depends=python', '--category=python', '--python-bin=/usr/bin/python',
+                           '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
                            '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', './home/test/setup.py']
@@ -140,7 +144,7 @@ def test_fpm_command_version():
         expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
                            '--version=1.2.0-jenkins-704', '--maintainer=CSI', '--exclude=*.pyc',
                            '--exclude=*.pyo', '--depends=python', '--category=python',
-                           '--template-scripts',
+                           '--python-bin=/usr/bin/python', '--template-scripts',
                            '--python-install-lib=/usr/lib/python2.7/dist-packages/',
                            '--python-install-bin=/usr/local/bin/',
                            '--before-remove=files/preremove', './home/test/setup.py']
