@@ -1,4 +1,4 @@
-from mock import patch, call, Mock
+from mock import call, Mock
 import pytest
 import os
 
@@ -9,191 +9,286 @@ from vdt.versionplugin.buildout.shared import read_dependencies
 from vdt.versionplugin.buildout.shared import extend_extra_args
 from vdt.versionplugin.buildout.shared import lookup_versions
 from vdt.versionplugin.buildout.shared import parse_version_extra_args
+from vdt.versionplugin.buildout.shared import traverse_dependencies
+from vdt.versionplugin.buildout.shared import strip_dependencies
+from vdt.versionplugin.buildout.shared import download_package
+from vdt.versionplugin.buildout.shared import build_with_fpm
 
 
-def test_delete_old_packages():
-    test_glob = ['test-1.deb', 'test-2.deb', 'test-3.deb']
-    with patch('vdt.versionplugin.buildout.shared.log'),\
-            patch('vdt.versionplugin.buildout.shared.glob') as mock_glob,\
-            patch('vdt.versionplugin.buildout.shared.os') as mock_os:
-
-        mock_glob.glob.return_value = test_glob
-
-        delete_old_packages()
-
-        calls = [call.remove(glob) for glob in test_glob]
-        mock_os.assert_has_calls(calls)
+@pytest.fixture
+def mock_logger(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.log', Mock())
 
 
-def test_build_dependent_packages():
-    pass
-    """
-    with patch('vdt.versionplugin.buildout.shared.log'),\
-            patch('vdt.versionplugin.buildout.shared.tempfile') as mock_temp,\
-            patch('vdt.versionplugin.buildout.shared.pip') as mock_pip,\
-            patch('vdt.versionplugin.buildout.shared.fpm_command') as mock_fpm,\
-            patch('vdt.versionplugin.buildout.shared.shutil') as mock_shutil,\
-            patch('vdt.versionplugin.buildout.shared.subprocess') as mock_subprocess,\
-            patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path,\
-            patch('vdt.versionplugin.buildout.shared.read_dependencies') as mock_read_dependencies,\
-            patch('vdt.versionplugin.buildout.shared.lookup_versions') as mock_lookup_versions:
+def test_delete_old_packages(monkeypatch, mock_logger):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.glob.glob',
+                        Mock(return_value=['test-1.deb', 'test-2.deb', 'test-3.deb']))
+    mock_os = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.remove', mock_os)
 
-            mock_temp.mkdtemp.return_value = '/home/test/'
-            mock_fpm.return_value = 'fpm -s python -t deb'
-            mock_os_path.exists.return_value = True
-            mock_os_path.join.return_value = ''
-            mock_read_dependencies.return_value = ['fabric', 'setuptools']
-            mock_lookup_versions.retrun_value = {'fabric': '1.0.0', 'setuptools': '2.0.0'}
+    delete_old_packages()
 
-            build_dependent_packages({'pyyaml': '1.0.0', 'puka': None}, 'versions.cfg')
-
-            pip_calls = [call(['install', 'puka', '--ignore-installed', '--no-install',
-                               '--build=' + mock_temp.mkdtemp.return_value]),
-                         call(['install', 'pyyaml==1.0.0', '--ignore-installed', '--no-install',
-                               '--build=' + mock_temp.mkdtemp.return_value])]
-            mock_pip.main.assert_has_calls(pip_calls)
-
-            fpm_calls = [call('pyyaml', '/home/test/setup.py', True,
-                              ['-d', 'fabric = 1.0.0', 'd', 'setuptools = 2.0.0']),
-                         call('pyyaml', '/home/test/setup.py', True,
-                              ['-d', 'fabric = 1.0.0', 'd', 'setuptools = 2.0.0'])]
-            mock_fpm.assert_has_calls(fpm_calls)
-
-            subprocess_calls = [call('fpm -s python -t deb'), call('fpm -s python -t deb')]
-            mock_subprocess.check_output.assert_has_calls(subprocess_calls)
-
-            mock_shutil.rmtree.assert_called_once_with(mock_temp.mkdtemp.return_value)
-            """
+    mock_os.assert_has_calls([call('test-1.deb'), call('test-2.deb'), call('test-3.deb')])
 
 
-def test_build_dependent_packages_exception():
-    with patch('vdt.versionplugin.buildout.shared.log'),\
-            patch('vdt.versionplugin.buildout.shared.tempfile') as mock_temp,\
-            patch('vdt.versionplugin.buildout.shared.pip') as mock_pip,\
-            patch('vdt.versionplugin.buildout.shared.shutil') as mock_shutil:
+def test_traverse_dependencies(monkeypatch):
+    mock_build_dependent_packages = Mock(side_effect=[{'test3': '2.0.0', 'test4': '2.0.0'},
+                                                      {'test5': '3.0.0', 'test6': None},
+                                                      None])
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.build_dependent_packages',
+                        mock_build_dependent_packages)
 
-            mock_temp.mkdtemp.return_value = '/home/test/'
-            mock_pip.main.side_effect = Exception('Boom!')
+    traverse_dependencies({'test1': '1.0.0', 'test2': '1.0.0'}, 'versions.cfg')
 
-            with pytest.raises(Exception):
-                build_dependent_packages({'test': 'test'}, 'versions.cfg')
-
-            mock_shutil.rmtree.assert_called_once_with(mock_temp.mkdtemp.return_value)
-
-
-def test_fpm_command_dependencies_and_extra_args():
-    with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
-        mock_os_path.join.return_value = 'files/preremove'
-        fpm_ret = fpm_command('test', './home/test/setup.py',
-                              no_python_dependencies=True,
-                              extra_args=['-d', 'test'])
-        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
-                           '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
-                           '--category=python', '--python-bin=/usr/bin/python',
-                           '--template-scripts',
-                           '--python-install-lib=/usr/lib/python2.7/dist-packages/',
-                           '--python-install-bin=/usr/local/bin/',
-                           '--before-remove=files/preremove', '--no-python-dependencies',
-                           '-d', 'test', './home/test/setup.py']
+    mock_build_dependent_packages.assert_has_calls([call({'test1': '1.0.0', 'test2': '1.0.0'},
+                                                         'versions.cfg'),
+                                                    call({'test3': '2.0.0', 'test4': '2.0.0'},
+                                                         'versions.cfg'),
+                                                    call({'test5': '3.0.0', 'test6': None},
+                                                         'versions.cfg')])
 
 
-def test_fpm_command_dependencies_and_no_extra_args():
-    with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
-        mock_os_path.join.return_value = 'files/preremove'
-        fpm_ret = fpm_command('test', './home/test/setup.py',
-                              no_python_dependencies=True)
-        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
-                           '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
-                           '--category=python', '--python-bin=/usr/bin/python',
-                           '--template-scripts',
-                           '--python-install-lib=/usr/lib/python2.7/dist-packages/',
-                           '--python-install-bin=/usr/local/bin/',
-                           '--before-remove=files/preremove', '--no-python-dependencies',
-                           './home/test/setup.py']
+def test_strip_dependencies():
+    setup_mock = Mock()
+    setup_mock.call_args = [None, {'install_requires': ['test1==1.0.0', 'Test2<=2.0.0',
+                                                        'test3>=3.0.0', 'Test4!=4.0.0', 'Test5']}]
+
+    dependencies = strip_dependencies(setup_mock)
+
+    assert dependencies == ['test1', 'test2', 'test3', 'test4', 'test5']
 
 
-def test_fpm_command_no_dependencies_and_no_extra_args():
-    with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
-        mock_os_path.join.return_value = 'files/preremove'
-        fpm_ret = fpm_command('test', './home/test/setup.py')
-        assert fpm_ret == ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
-                           '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
-                           '--category=python', '--python-bin=/usr/bin/python',
-                           '--template-scripts',
-                           '--python-install-lib=/usr/lib/python2.7/dist-packages/',
-                           '--python-install-bin=/usr/local/bin/',
-                           '--before-remove=files/preremove', './home/test/setup.py']
+def test_strip_dependencies_exception():
+    setup_mock = Mock(side_effect=Exception('Boom!'))
+
+    dependencies = strip_dependencies(setup_mock)
+
+    assert len(dependencies) == 0
 
 
-def test_fpm_command_broken_scheme():
-    with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
-        mock_os_path.join.return_value = 'files/preremove'
-        fpm_ret = fpm_command('pyyaml', './home/test/setup.py')
-        assert fpm_ret == ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
-                           '--maintainer=CSI', '--exclude=*.pyc', '--exclude=*.pyo',
-                           '--depends=python', '--category=python', '--python-bin=/usr/bin/python',
-                           '--template-scripts',
-                           '--python-install-lib=/usr/lib/python2.7/dist-packages/',
-                           '--python-install-bin=/usr/local/bin/',
-                           '--before-remove=files/preremove', './home/test/setup.py']
+def test_build_with_fpm(monkeypatch, mock_logger):
+    mock_fpm_command = Mock(return_value='fpm -s python -t deb')
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.fpm_command',
+                        mock_fpm_command)
+    mock_subprocess_check_output = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
+                        mock_subprocess_check_output)
+
+    build_with_fpm({'fabric': '1.0.0', 'setuptools': '2.0.0'}, 'puka', 'setup.py')
+
+    mock_fpm_command.assert_called_with('puka', 'setup.py',
+                                        extra_args=['-d', 'python-fabric = 1.0.0',
+                                                    '-d', 'python-setuptools = 2.0.0'],
+                                        no_python_dependencies=True)
+
+    mock_subprocess_check_output.assert_called_with('fpm -s python -t deb')
 
 
-def test_fpm_command_version():
-    with patch('vdt.versionplugin.buildout.shared.os.path') as mock_os_path:
-        mock_os_path.join.return_value = 'files/preremove'
-        expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
-                           '--version=1.2.0-jenkins-704', '--maintainer=CSI', '--exclude=*.pyc',
-                           '--exclude=*.pyo', '--depends=python', '--category=python',
-                           '--python-bin=/usr/bin/python', '--template-scripts',
-                           '--python-install-lib=/usr/lib/python2.7/dist-packages/',
-                           '--python-install-bin=/usr/local/bin/',
-                           '--before-remove=files/preremove', './home/test/setup.py']
-        result = fpm_command('pyyaml', './home/test/setup.py', version='1.2.0-jenkins-704')
-        assert sorted(result) == sorted(expected_result)
+def test_build_dependent_packages(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.tempfile.mkdtemp',
+                        Mock(return_value='/tmp/123/'))
+    mock_download_package = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.download_package', mock_download_package)
+    mock_shutil_rmtree = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.shutil.rmtree', mock_shutil_rmtree)
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.exists',
+                        Mock(return_value=True))
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.read_dependencies',
+                        Mock(return_value=['fabric', 'setuptools']))
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.lookup_versions',
+                        Mock(return_value={'fabric': '1.0.0', 'setuptools': '2.0.0'}))
+    mock_build_with_fpm = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.build_with_fpm', mock_build_with_fpm)
+
+    dependencies = build_dependent_packages({'pyyaml': '1.0.0', 'puka': None}, 'versions.cfg')
+
+    mock_download_package_calls = [call('puka', None, '/tmp/123/'),
+                                   call('pyyaml', '1.0.0', '/tmp/123/')]
+    mock_download_package.assert_has_calls(mock_download_package_calls)
+
+    build_with_fpm_calls = [call({'fabric': '1.0.0', 'setuptools': '2.0.0'},
+                                 'puka', '/tmp/123/puka/setup.py'),
+                            call({'fabric': '1.0.0', 'setuptools': '2.0.0'},
+                                 'pyyaml', '/tmp/123/pyyaml/setup.py')]
+    mock_build_with_fpm.assert_has_calls(build_with_fpm_calls)
+
+    mock_shutil_rmtree.assert_called_once_with('/tmp/123/')
+    assert dependencies == {'fabric': '1.0.0', 'setuptools': '2.0.0'}
 
 
-def test_read_dependencies():
-    with patch('vdt.versionplugin.buildout.shared.log'):
-            file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/setup.py')
-            expected_result = sorted(['setuptools', 'pyyaml', 'puka', 'couchbase'])
-            result = sorted(read_dependencies(file_name))
-            assert result == expected_result
+def test_download_package_with_version(monkeypatch):
+    mock_pip_main = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.pip.main', mock_pip_main)
+
+    download_package('puka', '1.0.0', '/tmp/123/')
+
+    expected_call = ['install', '-q', 'puka==1.0.0', '--ignore-installed',
+                     '--no-install', '--build=/tmp/123/']
+    mock_pip_main.assert_called_once_with(expected_call)
 
 
-def test_extend_extra_args_with_versions():
-    with patch('vdt.versionplugin.buildout.shared.log'):
-        extra_args = ['--test-1', '--test-2']
-        dependencies_with_versions = {'setuptools': '1.0.0', 'puka': '2.0.0'}
-        expected_result = sorted(['--test-1', '--test-2',
-                                  '-d', 'python-setuptools = 1.0.0',
-                                  '-d', 'python-puka = 2.0.0'])
-        result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
+def test_download_package_without_version(monkeypatch):
+    mock_pip_main = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.pip.main', mock_pip_main)
 
-        assert result == expected_result
+    download_package('pyyaml', None, '/tmp/123/')
 
-
-def test_extend_extra_args_without_versions():
-    with patch('vdt.versionplugin.buildout.shared.log'):
-        extra_args = ['--test-1', '--test-2']
-        dependencies_with_versions = {'setuptools': None, 'puka': None}
-        expected_result = sorted(['--test-1', '--test-2',
-                                  '-d', 'python-setuptools',
-                                  '-d', 'python-puka'])
-        result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
-
-        assert result == expected_result
+    expected_call = ['install', '-q', 'pyyaml', '--ignore-installed',
+                     '--no-install', '--build=/tmp/123/']
+    mock_pip_main.assert_called_once_with(expected_call)
 
 
-def test_extend_extra_args_broken_scheme():
-    with patch('vdt.versionplugin.buildout.shared.log'):
-        extra_args = ['--test-1', '--test-2']
-        dependencies_with_versions = {'pyyaml': None, 'pyzmq': '1.0.0'}
-        expected_result = sorted(['--test-1', '--test-2',
-                                  '-d', 'python-yaml',
-                                  '-d', 'python-zmq = 1.0.0'])
-        result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
+def test_build_dependent_packages_exception(monkeypatch, mock_logger):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.tempfile.mkdtemp',
+                        Mock(return_value='/home/test/'))
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.pip.main',
+                        Mock(side_effect=Exception('Boom!')))
+    mock_shutil = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.shutil.rmtree', mock_shutil)
 
-        assert result == expected_result
+    with pytest.raises(Exception):
+        build_dependent_packages({'test': 'test'}, 'versions.cfg')
+
+    mock_shutil.assert_called_once_with('/home/test/')
+
+
+def test_fpm_command_dependencies_and_extra_args(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.join',
+                        Mock(return_value='files/preremove'))
+
+    result = fpm_command('test', './home/test/setup.py',
+                         no_python_dependencies=True,
+                         extra_args=['-d', 'test'])
+
+    expected_result = ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
+                       '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
+                       '--category=python', '--python-bin=/usr/bin/python',
+                       '--template-scripts',
+                       '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--python-install-bin=/usr/local/bin/',
+                       '--before-remove=files/preremove', '--no-python-dependencies',
+                       '-d', 'test', './home/test/setup.py']
+
+    assert sorted(result) == sorted(expected_result)
+
+
+def test_fpm_command_dependencies_and_no_extra_args(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.join',
+                        Mock(return_value='files/preremove'))
+
+    result = fpm_command('test', './home/test/setup.py',
+                         no_python_dependencies=True)
+
+    expected_result = ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
+                       '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
+                       '--category=python', '--python-bin=/usr/bin/python',
+                       '--template-scripts',
+                       '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--python-install-bin=/usr/local/bin/',
+                       '--before-remove=files/preremove', '--no-python-dependencies',
+                       './home/test/setup.py']
+
+    assert sorted(result) == sorted(expected_result)
+
+
+def test_fpm_command_no_dependencies_and_no_extra_args(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.join',
+                        Mock(return_value='files/preremove'))
+
+    result = fpm_command('test', './home/test/setup.py')
+
+    expected_result = ['fpm', '-s', 'python', '-t', 'deb', '-f', '--maintainer=CSI',
+                       '--exclude=*.pyc', '--exclude=*.pyo', '--depends=python',
+                       '--category=python', '--python-bin=/usr/bin/python',
+                       '--template-scripts',
+                       '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--python-install-bin=/usr/local/bin/',
+                       '--before-remove=files/preremove', './home/test/setup.py']
+
+    assert sorted(result) == sorted(expected_result)
+
+
+def test_fpm_command_broken_scheme(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.join',
+                        Mock(return_value='files/preremove'))
+
+    result = fpm_command('pyyaml', './home/test/setup.py')
+
+    expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
+                       '--maintainer=CSI', '--exclude=*.pyc', '--exclude=*.pyo',
+                       '--depends=python', '--category=python', '--python-bin=/usr/bin/python',
+                       '--template-scripts',
+                       '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--python-install-bin=/usr/local/bin/',
+                       '--before-remove=files/preremove', './home/test/setup.py']
+
+    assert sorted(result) == sorted(expected_result)
+
+
+def test_fpm_command_version(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.join',
+                        Mock(return_value='files/preremove'))
+
+    result = fpm_command('pyyaml', './home/test/setup.py', version='1.2.0-jenkins-704')
+
+    expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
+                       '--version=1.2.0-jenkins-704', '--maintainer=CSI', '--exclude=*.pyc',
+                       '--exclude=*.pyo', '--depends=python', '--category=python',
+                       '--python-bin=/usr/bin/python', '--template-scripts',
+                       '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--python-install-bin=/usr/local/bin/',
+                       '--before-remove=files/preremove', './home/test/setup.py']
+
+    assert sorted(result) == sorted(expected_result)
+
+
+def test_read_dependencies(mock_logger):
+    file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/setup.py')
+
+    result = sorted(read_dependencies(file_name))
+
+    expected_result = sorted(['setuptools', 'pyyaml', 'puka', 'couchbase'])
+
+    assert result == expected_result
+
+
+def test_extend_extra_args_with_versions(mock_logger):
+    extra_args = ['--test-1', '--test-2']
+    dependencies_with_versions = {'setuptools': '1.0.0', 'puka': '2.0.0'}
+
+    result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
+
+    expected_result = sorted(['--test-1', '--test-2',
+                              '-d', 'python-setuptools = 1.0.0',
+                              '-d', 'python-puka = 2.0.0'])
+
+    assert result == expected_result
+
+
+def test_extend_extra_args_without_versions(mock_logger):
+    extra_args = ['--test-1', '--test-2']
+    dependencies_with_versions = {'setuptools': None, 'puka': None}
+
+    result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
+
+    expected_result = sorted(['--test-1', '--test-2',
+                              '-d', 'python-setuptools',
+                              '-d', 'python-puka'])
+
+    assert result == expected_result
+
+
+def test_extend_extra_args_broken_scheme(mock_logger):
+    extra_args = ['--test-1', '--test-2']
+    dependencies_with_versions = {'pyyaml': None, 'pyzmq': '1.0.0'}
+
+    result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
+
+    expected_result = sorted(['--test-1', '--test-2',
+                              '-d', 'python-yaml',
+                              '-d', 'python-zmq = 1.0.0'])
+
+    assert result == expected_result
 
 
 def _side_effect_get(_, dependency):
@@ -214,17 +309,18 @@ def _side_effect_has_option(_, dependency):
         return True
 
 
-def test_lookup_versions():
-    with patch('vdt.versionplugin.buildout.shared.log'),\
-            patch('vdt.versionplugin.buildout.shared.ConfigParser.ConfigParser.has_option',
-                  Mock(side_effect=_side_effect_has_option), create=True),\
-            patch('vdt.versionplugin.buildout.shared.ConfigParser.ConfigParser.get',
-                  Mock(side_effect=_side_effect_get), create=True):
+def test_lookup_versions(monkeypatch, mock_logger):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.ConfigParser.ConfigParser.has_option',
+                        Mock(side_effect=_side_effect_has_option))
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.ConfigParser.ConfigParser.get',
+                        Mock(side_effect=_side_effect_get))
 
-            expected_result = {'pyyaml': '1.0.0', 'puka': '2.0.0',
-                               'setuptools': '3.0.0', 'pyzmq': None}
-            result = lookup_versions(['pyyaml', 'puka', 'setuptools', 'pyzmq'], 'versions.cfg')
-            assert result == expected_result
+    result = lookup_versions(['pyyaml', 'puka', 'setuptools', 'pyzmq'], 'versions.cfg')
+
+    expected_result = {'pyyaml': '1.0.0', 'puka': '2.0.0',
+                       'setuptools': '3.0.0', 'pyzmq': None}
+
+    assert result == expected_result
 
 
 def test_parse_version_extra_args():

@@ -25,28 +25,36 @@ def traverse_dependencies(deps_with_versions, versions_file):
         traverse_dependencies(nested_deps_with_version, versions_file)
 
 
+def download_package(dependency, version, download_dir):
+    if version:
+        pip_args = dependency + '==' + version
+    else:
+        pip_args = dependency
+    pip.main(['install', '-q', pip_args, '--ignore-installed', '--no-install',
+              '--build=' + download_dir])
+
+
+def build_with_fpm(deps_with_version, package_name, setup_py, extra_args=[]):
+    extra_args = extend_extra_args(extra_args, deps_with_version)
+    fpm_cmd = fpm_command(package_name, setup_py, no_python_dependencies=True,
+                          extra_args=extra_args)
+    log.debug("Running command {0}".format(" ".join(fpm_cmd)))
+    log.debug(subprocess.check_output(fpm_cmd))
+
+
 def build_dependent_packages(deps_with_versions, versions_file):
     log.debug(">> Building dependent packages:")
     tmp_dir = tempfile.mkdtemp()
     nested_deps_with_version = {}
     try:
         for dependency, version in deps_with_versions.iteritems():
-            if version:
-                pkg = dependency + '==' + version
-            else:
-                pkg = dependency
-            pip.main(['install', '-q', pkg, '--ignore-installed', '--no-install',
-                      '--build=' + tmp_dir])
+            download_package(dependency, version, tmp_dir)
 
             setup_py = os.path.join(tmp_dir, dependency, 'setup.py')
             if os.path.exists(setup_py):
                 dependencies = read_dependencies(setup_py)
                 nested_deps_with_version.update(lookup_versions(dependencies, versions_file))
-                extra_args = extend_extra_args([], nested_deps_with_version)
-                fpm_cmd = fpm_command(dependency, setup_py, no_python_dependencies=True,
-                                      extra_args=extra_args)
-                log.debug("Running command {0}".format(" ".join(fpm_cmd)))
-                log.debug(subprocess.check_output(fpm_cmd))
+                build_with_fpm(nested_deps_with_version, dependency, setup_py)
     finally:
         shutil.rmtree(tmp_dir)
     return nested_deps_with_version
@@ -88,13 +96,13 @@ def read_dependencies(file_name):
     log.debug(">> Reading dependencies from %s:" % file_name)
     with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages') as _:
         _load_module(file_name)
-        dependencies = _strip_dependencies(setup_mock)
+        dependencies = strip_dependencies(setup_mock)
 
     log.debug(dependencies)
     return dependencies
 
 
-def _strip_dependencies(setup_mock):
+def strip_dependencies(setup_mock):
     try:
         dependencies = []
         for dep in setup_mock.call_args[1]['install_requires']:
