@@ -94,7 +94,8 @@ def delete_old_packages():
 
 def read_dependencies(file_name):
     log.debug(">> Reading dependencies from %s:" % file_name)
-    with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages') as _:
+    with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages'),\
+            patch('distutils.core.setup'):
         _load_module(file_name)
         dependencies = strip_dependencies(setup_mock)
 
@@ -117,13 +118,14 @@ def strip_dependencies(setup_mock):
 
 def _load_module(file_name):
     # in order to load setup.py we need to change working dir and add it to sys path
+    log.debug(">> Loading module")
     old_wd = os.getcwd()
     new_wd = os.path.dirname(file_name)
     os.chdir(new_wd)
     sys.path.insert(0, new_wd)
     try:
         imp.load_source('setup', file_name)
-    except SystemExit:
+    except SystemExit and IOError:
         # make sure nobody kills the package builder
         pass
     finally:
