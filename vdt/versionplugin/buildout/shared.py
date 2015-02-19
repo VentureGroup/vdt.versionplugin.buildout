@@ -16,7 +16,8 @@ log = logging.getLogger('vdt.versionplugin.buildout.package')
 broken_scheme_names = {'pyyaml': 'yaml',
                        'pyzmq': 'zmq',
                        'pycrypto': 'crypto',
-                       'python-debian': 'debian'}
+                       'python-debian': 'debian',
+                       'python-dateutil': 'dateutil'}
 
 
 def traverse_dependencies(deps_with_versions, versions_file):
