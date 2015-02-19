@@ -47,7 +47,7 @@ def build_with_fpm(deps_with_version, package_name, setup_py, extra_args=[]):
 def build_dependent_packages(deps_with_versions, versions_file):
     log.debug(">> Building dependent packages:")
     tmp_dir = tempfile.mkdtemp()
-    nested_deps_with_version = {}
+    parent_deps_with_version = {}
     try:
         for dependency, version in deps_with_versions.iteritems():
             download_package(dependency, version, tmp_dir)
@@ -55,11 +55,12 @@ def build_dependent_packages(deps_with_versions, versions_file):
             setup_py = os.path.join(tmp_dir, dependency, 'setup.py')
             if os.path.exists(setup_py):
                 dependencies = read_dependencies(setup_py)
-                nested_deps_with_version.update(lookup_versions(dependencies, versions_file))
+                nested_deps_with_version = lookup_versions(dependencies, versions_file)
+                parent_deps_with_version.update(nested_deps_with_version)
                 build_with_fpm(nested_deps_with_version, dependency, setup_py)
     finally:
         shutil.rmtree(tmp_dir)
-    return nested_deps_with_version
+    return parent_deps_with_version
 
 
 def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=None, version=None):
