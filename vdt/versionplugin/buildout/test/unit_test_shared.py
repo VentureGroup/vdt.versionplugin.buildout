@@ -77,8 +77,8 @@ def test_build_with_fpm(monkeypatch, mock_logger):
     build_with_fpm({'fabric': '1.0.0', 'setuptools': '2.0.0'}, 'puka', 'setup.py')
 
     mock_fpm_command.assert_called_with('puka', 'setup.py',
-                                        extra_args=['-d', 'python-fabric = 1.0.0',
-                                                    '-d', 'python-setuptools = 2.0.0'],
+                                        extra_args=['-d', 'python-fabric >= 1.0.0',
+                                                    '-d', 'python-setuptools >= 2.0.0'],
                                         no_python_dependencies=True)
 
     mock_subprocess_check_output.assert_called_with('fpm -s python -t deb')
@@ -259,8 +259,8 @@ def test_extend_extra_args_with_versions(mock_logger):
     result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
 
     expected_result = sorted(['--test-1', '--test-2',
-                              '-d', 'python-setuptools = 1.0.0',
-                              '-d', 'python-puka = 2.0.0'])
+                              '-d', 'python-setuptools >= 1.0.0',
+                              '-d', 'python-puka >= 2.0.0'])
 
     assert result == expected_result
 
@@ -286,7 +286,7 @@ def test_extend_extra_args_broken_scheme(mock_logger):
 
     expected_result = sorted(['--test-1', '--test-2',
                               '-d', 'python-yaml',
-                              '-d', 'python-zmq = 1.0.0'])
+                              '-d', 'python-zmq >= 1.0.0'])
 
     assert result == expected_result
 
