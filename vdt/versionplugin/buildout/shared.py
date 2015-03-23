@@ -63,12 +63,14 @@ def build_dependent_packages(deps_with_versions, versions_file):
     return parent_deps_with_version
 
 
-def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=None, version=None):
+def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=None, version=None, iteration=0):
     fpm_cmd = ['fpm']
     if pkg_name.lower() in broken_scheme_names:
         fpm_cmd += ['-n', 'python-' + broken_scheme_names[pkg_name.lower()]]
 
     if version:
+        if iteration:
+            version = '%s.%s' % (version, iteration)
         fpm_cmd += ['--version=%s' % version]
 
     pre_remove_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/preremove')
@@ -176,6 +178,7 @@ def parse_version_extra_args(version_args):
                              " specified after -i. Use -i multiple times to specify"
                              " multiple packages")
     parser.add_argument('--versions-file', help='Buildout versions.cfg')
+    parser.add_argument('--iteration', help="The iteration number for a hotfix")
     args, extra_args = parser.parse_known_args(version_args)
     
     return args, extra_args
