@@ -242,6 +242,23 @@ def test_fpm_command_version(monkeypatch):
     assert sorted(result) == sorted(expected_result)
 
 
+def test_fpm_command_version_hotfix(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.join',
+                        Mock(return_value='files/preremove'))
+
+    result = fpm_command('pyyaml', './home/test/setup.py', version='1.2.0-jenkins-704', iteration=1)
+
+    expected_result = ['fpm', '-n', 'python-yaml', '-s', 'python', '-t', 'deb', '-f',
+                       '--version=1.2.0-jenkins-704.1', '--maintainer=CSI', '--exclude=*.pyc',
+                       '--exclude=*.pyo', '--depends=python', '--category=python',
+                       '--python-bin=/usr/bin/python', '--template-scripts',
+                       '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--python-install-bin=/usr/local/bin/',
+                       '--before-remove=files/preremove', './home/test/setup.py']
+
+    assert sorted(result) == sorted(expected_result)
+
+
 def test_read_dependencies(mock_logger):
     file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/setup.py')
 
@@ -326,7 +343,9 @@ def test_lookup_versions(monkeypatch, mock_logger):
 def test_parse_version_extra_args():
     args, extra_args = parse_version_extra_args(['--include', 'test1', '-i', 'test2',
                                                  '--versions-file', '/home/test/versions.cfg',
-                                                 '-d', '--test1', '-d', '--test2'])
+                                                 '-d', '--test1', '-d', '--test2',
+                                                 '--iteration=1'])
     assert sorted(args.include) == sorted(['test1', 'test2'])
     assert args.versions_file == '/home/test/versions.cfg'
+    assert args.iteration == '1'
     assert sorted(extra_args) == sorted(['-d', '--test1', '-d', '--test2'])
