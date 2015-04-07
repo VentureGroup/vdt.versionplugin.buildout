@@ -75,7 +75,7 @@ def build_dependent_packages(deps_with_versions, versions_file):
             if python_dependencies:
                 nested_deps_with_version = lookup_versions(python_dependencies, versions_file)
                 parent_deps_with_version.update(nested_deps_with_version)
-        except subprocess.CalledProcessError as exc:
+        except subprocess.CalledProcessError:
             pass
 
     return parent_deps_with_version

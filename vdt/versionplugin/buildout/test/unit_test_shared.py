@@ -140,17 +140,10 @@ def test_download_package_without_version(monkeypatch):
 
 
 def test_build_dependent_packages_exception(monkeypatch, mock_logger):
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.tempfile.mkdtemp',
-                        Mock(return_value='/home/test/'))
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.pip.main',
                         Mock(side_effect=Exception('Boom!')))
-    mock_shutil = Mock()
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.shutil.rmtree', mock_shutil)
-
     with pytest.raises(Exception):
         build_dependent_packages({'test': 'test'}, 'versions.cfg')
-
-    mock_shutil.assert_called_once_with('/home/test/')
 
 
 def test_fpm_command_dependencies_and_extra_args(monkeypatch):
