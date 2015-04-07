@@ -10,12 +10,16 @@ import subprocess
 import glob
 from mock import patch
 import sys
+import json
 
 log = logging.getLogger('vdt.versionplugin.buildout.package')
 
 broken_scheme_names = {'pyyaml': 'yaml',
                        'pyzmq': 'zmq',
                        'pycrypto': 'crypto',
+                       'yaml': 'pyyaml',
+                       'zmq': 'pyzmq',
+                       'crypto': 'pycrypto',
                        'python-debian': 'debian',
                        'python-dateutil': 'dateutil'}
 
@@ -33,10 +37,10 @@ def download_package(dependency, version, download_dir):
     else:
         pip_args = dependency
     pip.main(['install', '-q', pip_args, '--ignore-installed', '--no-install',
-              '--build=' + download_dir])
+        '--build=' + download_dir])
 
 
-def build_with_fpm(deps_with_version, package_name, setup_py, extra_args=[]):
+def build_with_fpm(deps_with_version, package_name, setup_py=None, extra_args=[]):
     extra_args = extend_extra_args(extra_args, deps_with_version)
     fpm_cmd = fpm_command(package_name, setup_py, no_python_dependencies=True,
                           extra_args=extra_args)
@@ -50,23 +54,39 @@ def build_dependent_packages(deps_with_versions, versions_file):
     parent_deps_with_version = {}
     try:
         for dependency, version in deps_with_versions.iteritems():
-            download_package(dependency, version, tmp_dir)
+            fpm_cmd = fpm_command(dependency, setup_py=None, version=version)
+            log.debug("Running command {0}".format(" ".join(fpm_cmd)))
+            fpm_output = subprocess.check_output(fpm_cmd)
+            ruby_command = ['ruby',
+                            '-e',
+                            'require "json"; puts JSON.generate(%s)' % fpm_output.rstrip()]
+            ruby_output = json.loads(subprocess.check_output(ruby_command))
+            dpkg_output = subprocess.check_output(['dpkg', '-f', ruby_output['path'], 'Depends'])
 
-            setup_py = os.path.join(tmp_dir, dependency, 'setup.py')
-            if os.path.exists(setup_py):
-                dependencies = read_dependencies(setup_py)
-                nested_deps_with_version = lookup_versions(dependencies, versions_file)
-                parent_deps_with_version.update(nested_deps_with_version)
-                build_with_fpm(nested_deps_with_version, dependency, setup_py)
+            debian_dependencies = dpkg_output.replace('(', '').replace(')', '').split(',')
+
+            python_dependencies = []
+            for dependency in debian_dependencies:
+                dependency = dependency.split('==')[0].split('<=')[0].split('<<')[0].split('>=')[0].split('>>')[0].split('!=')[0].split('=')[0]
+                dependency = dependency.strip().lower()
+                if dependency != 'python':
+                    dependency = dependency.lower().replace('python-', '')
+                    if dependency in broken_scheme_names:
+                        dependency = broken_scheme_names[dependency]
+                    python_dependencies.append(dependency)
+
+            nested_deps_with_version = lookup_versions(python_dependencies, versions_file)
+            log.debug(nested_deps_with_version)
+            parent_deps_with_version.update(nested_deps_with_version)
     finally:
         shutil.rmtree(tmp_dir)
     return parent_deps_with_version
 
 
-def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=None, version=None, iteration=0):
+def fpm_command(pkg_name, setup_py=None, no_python_dependencies=False, extra_args=None, version=None, iteration=0):
     fpm_cmd = ['fpm']
     if pkg_name.lower() in broken_scheme_names:
-        fpm_cmd += ['-n', 'python-' + broken_scheme_names[pkg_name.lower()]]
+        fpm_cmd += ['--name', 'python-' + broken_scheme_names[pkg_name.lower()]]
 
     if version:
         if iteration:
@@ -83,9 +103,12 @@ def fpm_command(pkg_name, setup_py, no_python_dependencies=False, extra_args=Non
         fpm_cmd += ['--no-python-dependencies']
 
     if extra_args:
-        fpm_cmd += extra_args + [setup_py]
-    else:
+        fpm_cmd += extra_args\
+
+    if setup_py:
         fpm_cmd += [setup_py]
+    else:
+        fpm_cmd += [pkg_name]
 
     return fpm_cmd
 
@@ -100,10 +123,10 @@ def delete_old_packages():
 def read_dependencies(file_name):
     log.debug(">> Reading dependencies from %s:" % file_name)
     with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages'),\
-            patch('distutils.core.setup'):
+    patch('distutils.core.setup'):
         _load_module(file_name)
         dependencies = strip_dependencies(setup_mock)
-
+    
     log.debug(dependencies)
     return dependencies
 
