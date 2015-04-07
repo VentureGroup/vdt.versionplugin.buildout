@@ -3,8 +3,6 @@ import argparse
 import ConfigParser
 import imp
 import logging
-import tempfile
-import shutil
 import pip
 import subprocess
 import glob
@@ -50,12 +48,11 @@ def build_with_fpm(deps_with_version, package_name, setup_py=None, extra_args=[]
 
 def build_dependent_packages(deps_with_versions, versions_file):
     log.debug(">> Building dependent packages:")
-    tmp_dir = tempfile.mkdtemp()
     parent_deps_with_version = {}
-    try:
-        for dependency, version in deps_with_versions.iteritems():
-            fpm_cmd = fpm_command(dependency, setup_py=None, version=version)
-            log.debug("Running command {0}".format(" ".join(fpm_cmd)))
+    for dependency, version in deps_with_versions.iteritems():
+        fpm_cmd = fpm_command(dependency, setup_py=None, version=version)
+        log.debug("Running command {0}".format(" ".join(fpm_cmd)))
+        try:
             fpm_output = subprocess.check_output(fpm_cmd)
             ruby_command = ['ruby',
                             '-e',
@@ -75,11 +72,12 @@ def build_dependent_packages(deps_with_versions, versions_file):
                         dependency = broken_scheme_names[dependency]
                     python_dependencies.append(dependency)
 
-            nested_deps_with_version = lookup_versions(python_dependencies, versions_file)
-            log.debug(nested_deps_with_version)
-            parent_deps_with_version.update(nested_deps_with_version)
-    finally:
-        shutil.rmtree(tmp_dir)
+            if python_dependencies:
+                nested_deps_with_version = lookup_versions(python_dependencies, versions_file)
+                parent_deps_with_version.update(nested_deps_with_version)
+        except subprocess.CalledProcessError as exc:
+            pass
+
     return parent_deps_with_version
 
 
