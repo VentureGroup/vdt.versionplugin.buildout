@@ -38,39 +38,50 @@ def download_package(dependency, version, download_dir):
         '--build=' + download_dir])
 
 
-def build_with_fpm(deps_with_version, package_name, setup_py=None, extra_args=[]):
-    extra_args = extend_extra_args(extra_args, deps_with_version)
+def build_with_fpm(package_name, setup_py=None, extra_args=[], version=None):
     fpm_cmd = fpm_command(package_name, setup_py, no_python_dependencies=True,
-                          extra_args=extra_args)
+                          extra_args=extra_args, version=version)
     log.debug("Running command {0}".format(" ".join(fpm_cmd)))
-    log.debug(subprocess.check_output(fpm_cmd))
+    fpm_output = subprocess.check_output(fpm_cmd)
+    log.debug(fpm_output)
+    return fpm_output
+
+
+def ruby_to_json(ruby_hash):
+    ruby_command = ['ruby', '-e', 'require "json"; puts JSON.generate(%s)' % ruby_hash.rstrip()]
+    return json.loads(subprocess.check_output(ruby_command))
+
+
+def parse_from_dpkg_output(dpkg_output):
+    debian_dependencies = dpkg_output.replace('(', '').replace(')', '').split(',')
+    return debian_dependencies
+
+
+def read_dependencies_package(package_name):
+    dpkg_output = subprocess.check_output(['dpkg', '-f', package_name, 'Depends'])
+
+    debian_dependencies = parse_from_dpkg_output(dpkg_output)
+
+    python_dependencies = []
+    for dependency in debian_dependencies:
+        dependency = dependency.split('==')[0].split('<=')[0].split('<<')[0].split('>=')[0].split('>>')[0].split('!=')[0].split('=')[0]
+        dependency = dependency.strip().lower()
+        if dependency != 'python':
+            dependency = dependency.lower().replace('python-', '')
+            if dependency in broken_scheme_names:
+                dependency = broken_scheme_names[dependency]
+            python_dependencies.append(dependency)
+    return python_dependencies
 
 
 def build_dependent_packages(deps_with_versions, versions_file):
     log.debug(">> Building dependent packages:")
     parent_deps_with_version = {}
-    for dependency, version in deps_with_versions.iteritems():
-        fpm_cmd = fpm_command(dependency, setup_py=None, version=version)
-        log.debug("Running command {0}".format(" ".join(fpm_cmd)))
+    for package_name, version in deps_with_versions.iteritems():
         try:
-            fpm_output = subprocess.check_output(fpm_cmd)
-            ruby_command = ['ruby',
-                            '-e',
-                            'require "json"; puts JSON.generate(%s)' % fpm_output.rstrip()]
-            ruby_output = json.loads(subprocess.check_output(ruby_command))
-            dpkg_output = subprocess.check_output(['dpkg', '-f', ruby_output['path'], 'Depends'])
-
-            debian_dependencies = dpkg_output.replace('(', '').replace(')', '').split(',')
-
-            python_dependencies = []
-            for dependency in debian_dependencies:
-                dependency = dependency.split('==')[0].split('<=')[0].split('<<')[0].split('>=')[0].split('>>')[0].split('!=')[0].split('=')[0]
-                dependency = dependency.strip().lower()
-                if dependency != 'python':
-                    dependency = dependency.lower().replace('python-', '')
-                    if dependency in broken_scheme_names:
-                        dependency = broken_scheme_names[dependency]
-                    python_dependencies.append(dependency)
+            fpm_output = build_with_fpm(package_name, version=version)
+            json_output = ruby_to_json(fpm_output)
+            python_dependencies = read_dependencies_package(json_output['path'])
 
             if python_dependencies:
                 nested_deps_with_version = lookup_versions(python_dependencies, versions_file)
@@ -118,7 +129,7 @@ def delete_old_packages():
         os.remove(package)
 
 
-def read_dependencies(file_name):
+def read_dependencies_setup_py(file_name):
     log.debug(">> Reading dependencies from %s:" % file_name)
     with patch('setuptools.setup') as setup_mock, patch('setuptools.find_packages'),\
     patch('distutils.core.setup'):

@@ -3,7 +3,7 @@ import subprocess
 import os
 
 from vdt.versionplugin.buildout.shared import parse_version_extra_args
-from vdt.versionplugin.buildout.shared import read_dependencies
+from vdt.versionplugin.buildout.shared import read_dependencies_setup_py
 from vdt.versionplugin.buildout.shared import lookup_versions
 from vdt.versionplugin.buildout.shared import extend_extra_args
 from vdt.versionplugin.buildout.shared import fpm_command
@@ -19,7 +19,7 @@ def build_package(version):
     """
     delete_old_packages()
     args, extra_args = parse_version_extra_args(version.extra_args)
-    deps = read_dependencies(os.path.join(os.getcwd(), 'setup.py'))
+    deps = read_dependencies_setup_py(os.path.join(os.getcwd(), 'setup.py'))
     deps_with_versions = lookup_versions(deps, args.versions_file)
     traverse_dependencies(deps_with_versions, args.versions_file)
     extra_args = extend_extra_args(extra_args, deps_with_versions)

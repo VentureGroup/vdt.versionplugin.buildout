@@ -1,11 +1,11 @@
-from mock import call, Mock
+from mock import call, Mock, MagicMock, sentinel
 import pytest
 import os
 
 from vdt.versionplugin.buildout.shared import delete_old_packages
 from vdt.versionplugin.buildout.shared import build_dependent_packages
 from vdt.versionplugin.buildout.shared import fpm_command
-from vdt.versionplugin.buildout.shared import read_dependencies
+from vdt.versionplugin.buildout.shared import read_dependencies_setup_py
 from vdt.versionplugin.buildout.shared import extend_extra_args
 from vdt.versionplugin.buildout.shared import lookup_versions
 from vdt.versionplugin.buildout.shared import parse_version_extra_args
@@ -13,6 +13,9 @@ from vdt.versionplugin.buildout.shared import traverse_dependencies
 from vdt.versionplugin.buildout.shared import strip_dependencies
 from vdt.versionplugin.buildout.shared import download_package
 from vdt.versionplugin.buildout.shared import build_with_fpm
+from vdt.versionplugin.buildout.shared import ruby_to_json
+from vdt.versionplugin.buildout.shared import read_dependencies_package
+from vdt.versionplugin.buildout.shared import parse_from_dpkg_output
 
 
 @pytest.fixture
@@ -74,47 +77,40 @@ def test_build_with_fpm(monkeypatch, mock_logger):
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
                         mock_subprocess_check_output)
 
-    build_with_fpm({'fabric': '1.0.0', 'setuptools': '2.0.0'}, 'puka', 'setup.py')
+    build_with_fpm('puka', 'setup.py', extra_args=['-d', 'python-fabric >= 1.0.0',
+                                                   '-d', 'python-setuptools >= 2.0.0'])
 
     mock_fpm_command.assert_called_with('puka', 'setup.py',
                                         extra_args=['-d', 'python-fabric >= 1.0.0',
                                                     '-d', 'python-setuptools >= 2.0.0'],
-                                        no_python_dependencies=True)
+                                        no_python_dependencies=True,
+                                        version=None)
 
     mock_subprocess_check_output.assert_called_with('fpm -s python -t deb')
 
 
-@pytest.mark.skipif(True, reason="Need to be fixed")
-def test_build_dependent_packages(monkeypatch):
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.tempfile.mkdtemp',
-                        Mock(return_value='/tmp/123/'))
-    mock_download_package = Mock()
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.download_package', mock_download_package)
-    mock_shutil_rmtree = Mock()
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.shutil.rmtree', mock_shutil_rmtree)
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os.path.exists',
-                        Mock(return_value=True))
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.read_dependencies',
-                        Mock(return_value=['fabric', 'setuptools']))
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.lookup_versions',
-                        Mock(return_value={'fabric': '1.0.0', 'setuptools': '2.0.0'}))
+def test_build_dependent_packages(monkeypatch, mock_logger):
     mock_build_with_fpm = Mock()
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.build_with_fpm', mock_build_with_fpm)
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.ruby_to_json', MagicMock())
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.read_dependencies_package',
+                        Mock(side_effect=[['fabric', 'setuptools'],
+                                          ['paramiko', 'requests'],
+                                          None]))
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.lookup_versions',
+                        Mock(side_effect=[{'fabric': '1.0.0', 'setuptools': '2.0.0'},
+                                          {'paramiko': '3.0.0', 'requests': None}]))
 
-    dependencies = build_dependent_packages({'pyyaml': '1.0.0', 'puka': None}, 'versions.cfg')
+    dependencies = build_dependent_packages({'pyyaml': '1.0.0', 'puka': None, 'pyasn1': '2.0.0'},
+                                            'versions.cfg')
 
-    mock_download_package_calls = [call('puka', None, '/tmp/123/'),
-                                   call('pyyaml', '1.0.0', '/tmp/123/')]
-    mock_download_package.assert_has_calls(mock_download_package_calls)
-
-    build_with_fpm_calls = [call({'fabric': '1.0.0', 'setuptools': '2.0.0'},
-                                 'puka', '/tmp/123/puka/setup.py'),
-                            call({'fabric': '1.0.0', 'setuptools': '2.0.0'},
-                                 'pyyaml', '/tmp/123/pyyaml/setup.py')]
+    build_with_fpm_calls = [call('puka', version=None),
+                            call('pyyaml', version='1.0.0'),
+                            call('pyasn1', version='2.0.0')]
     mock_build_with_fpm.assert_has_calls(build_with_fpm_calls)
 
-    mock_shutil_rmtree.assert_called_once_with('/tmp/123/')
-    assert dependencies == {'fabric': '1.0.0', 'setuptools': '2.0.0'}
+    assert dependencies == {'fabric': '1.0.0', 'setuptools': '2.0.0',
+                            'paramiko': '3.0.0', 'requests': None}
 
 
 def test_download_package_with_version(monkeypatch):
@@ -139,11 +135,45 @@ def test_download_package_without_version(monkeypatch):
     mock_pip_main.assert_called_once_with(expected_call)
 
 
-def test_build_dependent_packages_exception(monkeypatch, mock_logger):
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.pip.main',
-                        Mock(side_effect=Exception('Boom!')))
-    with pytest.raises(Exception):
-        build_dependent_packages({'test': 'test'}, 'versions.cfg')
+def test_ruby_to_json(monkeypatch):
+    mock_subprocess_check_output = Mock(return_value='{}')
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
+                        mock_subprocess_check_output)
+
+    ruby_to_json('{:timestamp=>"2015-04-02T14:17:29.101257+0200", :message=>"Created package", :path=>"python-elasticsearch-curator_3.0.3_all.deb"}')
+
+    mock_subprocess_check_output.assert_called_once_with(['ruby', '-e',
+                                                          'require "json"; puts JSON.generate({:timestamp=>"2015-04-02T14:17:29.101257+0200", :message=>"Created package", :path=>"python-elasticsearch-curator_3.0.3_all.deb"})'])
+
+
+def test_read_dependencies_package(monkeypatch):
+    mock_subprocess_check_output = Mock(return_value=sentinel.some_string)
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
+                        mock_subprocess_check_output)
+
+    dependencies = ['python-yaml == 1.0.0', 'python-zmq <= 2.0.0', 'python-crypto << 3.0.0',
+                    'python-package_1 >= 4.0.0', 'packAge_2 >> 5.0.0', 'package_3 != 6.0.0',
+                    'package_4 = 7.0.0', 'python', 'Python']
+
+    mock_parse_from_dpkg_output = Mock(return_value=dependencies)
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.parse_from_dpkg_output',
+                        mock_parse_from_dpkg_output)
+
+    result = read_dependencies_package('puka')
+
+    expected_result = ['pyyaml', 'pyzmq', 'pycrypto', 'package_1', 'package_2', 'package_3',
+                       'package_4']
+
+    mock_subprocess_check_output.assert_called_once_with(['dpkg', '-f', 'puka', 'Depends'])
+    mock_parse_from_dpkg_output.assert_called_once_with(sentinel.some_string)
+
+    assert result == expected_result
+
+
+def test_parse_from_dpkg_output():
+    result = parse_from_dpkg_output('erlang-nox (>= 1:13.b.3), adduser (= 3.1), logrotate')
+    expected_result = ['erlang-nox >= 1:13.b.3', ' adduser = 3.1', ' logrotate']
+    assert result == expected_result
 
 
 def test_fpm_command_dependencies_and_extra_args(monkeypatch):
@@ -256,7 +286,7 @@ def test_fpm_command_version_hotfix(monkeypatch):
 def test_read_dependencies(mock_logger):
     file_name = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'files/setup.py')
 
-    result = sorted(read_dependencies(file_name))
+    result = sorted(read_dependencies_setup_py(file_name))
 
     expected_result = sorted(['setuptools', 'pyyaml', 'puka', 'couchbase'])
 
