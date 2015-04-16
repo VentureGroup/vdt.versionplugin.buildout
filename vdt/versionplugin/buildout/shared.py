@@ -38,9 +38,7 @@ def download_package(dependency, version, download_dir):
         '--build=' + download_dir])
 
 
-def build_with_fpm(package_name, deps_with_version=None, setup_py=None, extra_args=None, version=None, no_python_dependencies=True):
-    if deps_with_version:
-        extra_args = extend_extra_args(extra_args, deps_with_version)
+def build_with_fpm(package_name, setup_py=None, extra_args=None, version=None, no_python_dependencies=True):
     fpm_cmd = fpm_command(package_name, setup_py, no_python_dependencies=no_python_dependencies,
                           extra_args=extra_args, version=version)
     log.debug("Running command {0}".format(" ".join(fpm_cmd)))
@@ -70,8 +68,6 @@ def read_dependencies_package(package_name):
         dependency = dependency.strip().lower()
         if dependency != 'python':
             dependency = dependency.lower().replace('python-', '')
-            if dependency in broken_scheme_names:
-                dependency = broken_scheme_names[dependency]
             python_dependencies.append(dependency)
     return python_dependencies
 
@@ -90,7 +86,9 @@ def build_dependent_packages(deps_with_versions, versions_file):
                 # we have to build the package two times
                 # first time: get dependencies
                 # second time: build with fixed name scheme and correct versions
-                build_with_fpm(package_name, deps_with_version=temp_deps_with_versions,
+                extra_args = create_fpm_extra_args(fix_dependencies(temp_deps_with_versions))
+
+                build_with_fpm(package_name, extra_args=extra_args,
                                version=version, no_python_dependencies=True)
 
                 for dep_with_version in temp_deps_with_versions:
@@ -179,14 +177,23 @@ def _load_module(file_name):
         os.chdir(old_wd)
 
 
-def extend_extra_args(extra_args, dependencies_with_versions):
-    log.debug(">> Extending extra args:")
-    if not extra_args:
-            extra_args = []
+def fix_dependencies(dependencies_with_versions):
+    fixed_dependencies_with_versions = []
     for pkg_name, version in dependencies_with_versions:
         if pkg_name in broken_scheme_names:
-            pkg_name = broken_scheme_names[pkg_name]
+            fixed_dependencies_with_versions.append((broken_scheme_names[pkg_name], version))
+        else:
+            fixed_dependencies_with_versions.append((pkg_name, version))
+    return fixed_dependencies_with_versions
 
+
+def create_fpm_extra_args(dependencies_with_versions, existing_extra_args=None):
+    log.debug(">> Extending extra args:")
+    if existing_extra_args:
+        extra_args = existing_extra_args
+    else:
+        extra_args = []
+    for pkg_name, version in dependencies_with_versions:
         if version:
             arg = 'python-' + pkg_name + ' >= ' + version
         else:

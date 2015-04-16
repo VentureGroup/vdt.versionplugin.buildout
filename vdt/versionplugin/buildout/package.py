@@ -5,10 +5,11 @@ import os
 from vdt.versionplugin.buildout.shared import parse_version_extra_args
 from vdt.versionplugin.buildout.shared import read_dependencies_setup_py
 from vdt.versionplugin.buildout.shared import lookup_versions
-from vdt.versionplugin.buildout.shared import extend_extra_args
+from vdt.versionplugin.buildout.shared import create_fpm_extra_args
 from vdt.versionplugin.buildout.shared import fpm_command
 from vdt.versionplugin.buildout.shared import delete_old_packages
 from vdt.versionplugin.buildout.shared import traverse_dependencies
+from vdt.versionplugin.buildout.shared import fix_dependencies
 
 log = logging.getLogger('vdt.versionplugin.buildout.package')
 
@@ -22,7 +23,8 @@ def build_package(version):
     deps = read_dependencies_setup_py(os.path.join(os.getcwd(), 'setup.py'))
     deps_with_versions = lookup_versions(deps, args.versions_file)
     traverse_dependencies(deps_with_versions, args.versions_file)
-    extra_args = extend_extra_args(extra_args, deps_with_versions)
+    deps_with_versions = fix_dependencies(deps_with_versions)
+    extra_args = create_fpm_extra_args(deps_with_versions, extra_args)
 
     log.debug("Building {0} version {1} with "
               "vdt.versionplugin.buildout".format(os.path.basename(os.getcwd()), version))

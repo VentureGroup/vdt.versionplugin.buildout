@@ -6,7 +6,7 @@ from vdt.versionplugin.buildout.shared import delete_old_packages
 from vdt.versionplugin.buildout.shared import build_dependent_packages
 from vdt.versionplugin.buildout.shared import fpm_command
 from vdt.versionplugin.buildout.shared import read_dependencies_setup_py
-from vdt.versionplugin.buildout.shared import extend_extra_args
+from vdt.versionplugin.buildout.shared import create_fpm_extra_args
 from vdt.versionplugin.buildout.shared import lookup_versions
 from vdt.versionplugin.buildout.shared import parse_version_extra_args
 from vdt.versionplugin.buildout.shared import traverse_dependencies
@@ -123,10 +123,11 @@ def test_build_dependent_packages(monkeypatch, mock_logger):
                                             'versions.cfg')
 
     build_with_fpm_calls = [call('pyyaml', no_python_dependencies=False, version='1.0.0'),
-                            call('pyyaml', no_python_dependencies=True, deps_with_version=[('fabric', '1.0.0'), ('setuptools', '2.0.0')], version='1.0.0'),
+                            call('pyyaml', no_python_dependencies=True, extra_args=['-d', 'python-fabric >= 1.0.0', '-d', 'python-setuptools >= 2.0.0'], version='1.0.0'),
                             call('puka', no_python_dependencies=False, version=None),
-                            call('puka', no_python_dependencies=True, deps_with_version=[('paramiko', None), ('fabric', '1.0.0')], version=None),
+                            call('puka', no_python_dependencies=True, extra_args=['-d', 'python-paramiko', '-d', 'python-fabric >= 1.0.0'], version=None),
                             call('pyasn1', no_python_dependencies=False, version='2.0.0')]
+
     mock_build_with_fpm.assert_has_calls(build_with_fpm_calls)
 
     assert dependencies == [('fabric', '1.0.0'), ('setuptools', '2.0.0'),
@@ -181,7 +182,7 @@ def test_read_dependencies_package(monkeypatch):
 
     result = read_dependencies_package('puka')
 
-    expected_result = ['pyyaml', 'pyzmq', 'pycrypto', 'package_1', 'package_2', 'package_3',
+    expected_result = ['yaml', 'zmq', 'crypto', 'package_1', 'package_2', 'package_3',
                        'package_4']
 
     mock_subprocess_check_output.assert_called_once_with(['dpkg', '-f', 'puka', 'Depends'])
@@ -313,11 +314,11 @@ def test_read_dependencies(mock_logger):
     assert result == expected_result
 
 
-def test_extend_extra_args_with_versions(mock_logger):
+def test_create_fpm_extra_args_with_versions(mock_logger):
     extra_args = ['--test-1', '--test-2']
     dependencies_with_versions = [('setuptools', '1.0.0'), ('puka', '2.0.0')]
 
-    result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
+    result = sorted(create_fpm_extra_args(dependencies_with_versions, extra_args))
 
     expected_result = sorted(['--test-1', '--test-2',
                               '-d', 'python-setuptools >= 1.0.0',
@@ -326,28 +327,15 @@ def test_extend_extra_args_with_versions(mock_logger):
     assert result == expected_result
 
 
-def test_extend_extra_args_without_versions(mock_logger):
+def test_create_fpm_extra_args_without_versions(mock_logger):
     extra_args = ['--test-1', '--test-2']
     dependencies_with_versions = [('setuptools', None), ('puka', None)]
 
-    result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
+    result = sorted(create_fpm_extra_args(dependencies_with_versions, extra_args))
 
     expected_result = sorted(['--test-1', '--test-2',
                               '-d', 'python-setuptools',
                               '-d', 'python-puka'])
-
-    assert result == expected_result
-
-
-def test_extend_extra_args_broken_scheme(mock_logger):
-    extra_args = ['--test-1', '--test-2']
-    dependencies_with_versions = [('pyyaml', None), ('pyzmq', '1.0.0')]
-
-    result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
-
-    expected_result = sorted(['--test-1', '--test-2',
-                              '-d', 'python-yaml',
-                              '-d', 'python-zmq >= 1.0.0'])
 
     assert result == expected_result
 
