@@ -92,8 +92,10 @@ def build_dependent_packages(deps_with_versions, versions_file):
                 # second time: build with fixed name scheme and correct versions
                 build_with_fpm(package_name, deps_with_version=temp_deps_with_versions,
                                version=version, no_python_dependencies=True)
-                if not temp_deps_with_versions in nested_deps_with_version:
-                    nested_deps_with_version = nested_deps_with_version + temp_deps_with_versions
+
+                for dep_with_version in temp_deps_with_versions:
+                    if dep_with_version not in nested_deps_with_version:
+                        nested_deps_with_version.append(dep_with_version)
         except subprocess.CalledProcessError:
             pass
 

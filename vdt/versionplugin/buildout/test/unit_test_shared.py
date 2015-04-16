@@ -77,6 +77,24 @@ def test_build_with_fpm(monkeypatch, mock_logger):
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
                         mock_subprocess_check_output)
 
+    build_with_fpm('puka', setup_py='setup.py')
+
+    mock_fpm_command.assert_called_with('puka', 'setup.py',
+                                        extra_args=None,
+                                        no_python_dependencies=True,
+                                        version=None)
+
+    mock_subprocess_check_output.assert_called_with('fpm -s python -t deb')
+
+
+def test_build_with_fpm_extra_args(monkeypatch, mock_logger):
+    mock_fpm_command = Mock(return_value='fpm -s python -t deb')
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.fpm_command',
+                        mock_fpm_command)
+    mock_subprocess_check_output = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
+                        mock_subprocess_check_output)
+
     build_with_fpm('puka', setup_py='setup.py', extra_args=['-d', 'python-fabric >= 1.0.0',
                                                             '-d', 'python-setuptools >= 2.0.0'])
 
@@ -95,11 +113,11 @@ def test_build_dependent_packages(monkeypatch, mock_logger):
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.ruby_to_json', MagicMock())
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.read_dependencies_package',
                         Mock(side_effect=[['fabric', 'setuptools'],
-                                          ['paramiko', 'requests'],
+                                          ['paramiko', 'fabric'],
                                           None]))
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.lookup_versions',
                         Mock(side_effect=[[('fabric', '1.0.0'), ('setuptools', '2.0.0')],
-                                          [('paramiko', '3.0.0'), ('requests', None)]]))
+                                          [('paramiko', None), ('fabric', '1.0.0')]]))
 
     dependencies = build_dependent_packages([('pyyaml', '1.0.0'), ('puka', None), ('pyasn1', '2.0.0')],
                                             'versions.cfg')
@@ -107,12 +125,12 @@ def test_build_dependent_packages(monkeypatch, mock_logger):
     build_with_fpm_calls = [call('pyyaml', no_python_dependencies=False, version='1.0.0'),
                             call('pyyaml', no_python_dependencies=True, deps_with_version=[('fabric', '1.0.0'), ('setuptools', '2.0.0')], version='1.0.0'),
                             call('puka', no_python_dependencies=False, version=None),
-                            call('puka', no_python_dependencies=True, deps_with_version=[('paramiko', '3.0.0'), ('requests', None)], version=None),
+                            call('puka', no_python_dependencies=True, deps_with_version=[('paramiko', None), ('fabric', '1.0.0')], version=None),
                             call('pyasn1', no_python_dependencies=False, version='2.0.0')]
     mock_build_with_fpm.assert_has_calls(build_with_fpm_calls)
 
     assert dependencies == [('fabric', '1.0.0'), ('setuptools', '2.0.0'),
-                            ('paramiko', '3.0.0'), ('requests', None)]
+                            ('paramiko', None)]
 
 
 def test_download_package_with_version(monkeypatch):
