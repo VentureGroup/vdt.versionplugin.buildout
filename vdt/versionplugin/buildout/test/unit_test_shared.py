@@ -77,8 +77,8 @@ def test_build_with_fpm(monkeypatch, mock_logger):
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
                         mock_subprocess_check_output)
 
-    build_with_fpm('puka', 'setup.py', extra_args=['-d', 'python-fabric >= 1.0.0',
-                                                   '-d', 'python-setuptools >= 2.0.0'])
+    build_with_fpm('puka', setup_py='setup.py', extra_args=['-d', 'python-fabric >= 1.0.0',
+                                                            '-d', 'python-setuptools >= 2.0.0'])
 
     mock_fpm_command.assert_called_with('puka', 'setup.py',
                                         extra_args=['-d', 'python-fabric >= 1.0.0',
@@ -98,19 +98,21 @@ def test_build_dependent_packages(monkeypatch, mock_logger):
                                           ['paramiko', 'requests'],
                                           None]))
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.lookup_versions',
-                        Mock(side_effect=[{'fabric': '1.0.0', 'setuptools': '2.0.0'},
-                                          {'paramiko': '3.0.0', 'requests': None}]))
+                        Mock(side_effect=[[('fabric', '1.0.0'), ('setuptools', '2.0.0')],
+                                          [('paramiko', '3.0.0'), ('requests', None)]]))
 
-    dependencies = build_dependent_packages({'pyyaml': '1.0.0', 'puka': None, 'pyasn1': '2.0.0'},
+    dependencies = build_dependent_packages([('pyyaml', '1.0.0'), ('puka', None), ('pyasn1', '2.0.0')],
                                             'versions.cfg')
 
-    build_with_fpm_calls = [call('puka', version=None),
-                            call('pyyaml', version='1.0.0'),
-                            call('pyasn1', version='2.0.0')]
+    build_with_fpm_calls = [call('pyyaml', no_python_dependencies=False, version='1.0.0'),
+                            call('pyyaml', no_python_dependencies=True, deps_with_version=[('fabric', '1.0.0'), ('setuptools', '2.0.0')], version='1.0.0'),
+                            call('puka', no_python_dependencies=False, version=None),
+                            call('puka', no_python_dependencies=True, deps_with_version=[('paramiko', '3.0.0'), ('requests', None)], version=None),
+                            call('pyasn1', no_python_dependencies=False, version='2.0.0')]
     mock_build_with_fpm.assert_has_calls(build_with_fpm_calls)
 
-    assert dependencies == {'fabric': '1.0.0', 'setuptools': '2.0.0',
-                            'paramiko': '3.0.0', 'requests': None}
+    assert dependencies == [('fabric', '1.0.0'), ('setuptools', '2.0.0'),
+                            ('paramiko', '3.0.0'), ('requests', None)]
 
 
 def test_download_package_with_version(monkeypatch):
@@ -295,7 +297,7 @@ def test_read_dependencies(mock_logger):
 
 def test_extend_extra_args_with_versions(mock_logger):
     extra_args = ['--test-1', '--test-2']
-    dependencies_with_versions = {'setuptools': '1.0.0', 'puka': '2.0.0'}
+    dependencies_with_versions = [('setuptools', '1.0.0'), ('puka', '2.0.0')]
 
     result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
 
@@ -308,7 +310,7 @@ def test_extend_extra_args_with_versions(mock_logger):
 
 def test_extend_extra_args_without_versions(mock_logger):
     extra_args = ['--test-1', '--test-2']
-    dependencies_with_versions = {'setuptools': None, 'puka': None}
+    dependencies_with_versions = [('setuptools', None), ('puka', None)]
 
     result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
 
@@ -321,7 +323,7 @@ def test_extend_extra_args_without_versions(mock_logger):
 
 def test_extend_extra_args_broken_scheme(mock_logger):
     extra_args = ['--test-1', '--test-2']
-    dependencies_with_versions = {'pyyaml': None, 'pyzmq': '1.0.0'}
+    dependencies_with_versions = [('pyyaml', None), ('pyzmq', '1.0.0')]
 
     result = sorted(extend_extra_args(extra_args, dependencies_with_versions))
 
@@ -358,8 +360,8 @@ def test_lookup_versions(monkeypatch, mock_logger):
 
     result = lookup_versions(['pyyaml', 'puka', 'setuptools', 'pyzmq'], 'versions.cfg')
 
-    expected_result = {'pyyaml': '1.0.0', 'puka': '2.0.0',
-                       'setuptools': '3.0.0', 'pyzmq': None}
+    expected_result = [('pyyaml', '1.0.0'), ('puka', '2.0.0'),
+                       ('setuptools', '3.0.0'), ('pyzmq', None)]
 
     assert result == expected_result
 
