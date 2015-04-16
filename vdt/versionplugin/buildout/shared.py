@@ -38,8 +38,10 @@ def download_package(dependency, version, download_dir):
         '--build=' + download_dir])
 
 
-def build_with_fpm(package_name, setup_py=None, extra_args=[], version=None):
-    fpm_cmd = fpm_command(package_name, setup_py, no_python_dependencies=True,
+def build_with_fpm(package_name, deps_with_version=None, setup_py=None, extra_args=None, version=None, no_python_dependencies=True):
+    if deps_with_version:
+        extra_args = extend_extra_args(extra_args, deps_with_version)
+    fpm_cmd = fpm_command(package_name, setup_py, no_python_dependencies=no_python_dependencies,
                           extra_args=extra_args, version=version)
     log.debug("Running command {0}".format(" ".join(fpm_cmd)))
     fpm_output = subprocess.check_output(fpm_cmd)
@@ -76,20 +78,26 @@ def read_dependencies_package(package_name):
 
 def build_dependent_packages(deps_with_versions, versions_file):
     log.debug(">> Building dependent packages:")
-    parent_deps_with_version = {}
-    for package_name, version in deps_with_versions.iteritems():
+    nested_deps_with_version = []
+    for package_name, version in deps_with_versions:
         try:
-            fpm_output = build_with_fpm(package_name, version=version)
+            fpm_output = build_with_fpm(package_name, version=version, no_python_dependencies=False)
             json_output = ruby_to_json(fpm_output)
             python_dependencies = read_dependencies_package(json_output['path'])
 
             if python_dependencies:
-                nested_deps_with_version = lookup_versions(python_dependencies, versions_file)
-                parent_deps_with_version.update(nested_deps_with_version)
+                temp_deps_with_versions = lookup_versions(python_dependencies, versions_file)
+                # we have to build the package two times
+                # first time: get dependencies
+                # second time: build with fixed name scheme and correct versions
+                build_with_fpm(package_name, deps_with_version=temp_deps_with_versions,
+                               version=version, no_python_dependencies=True)
+                if not temp_deps_with_versions in nested_deps_with_version:
+                    nested_deps_with_version = nested_deps_with_version + temp_deps_with_versions
         except subprocess.CalledProcessError:
             pass
 
-    return parent_deps_with_version
+    return nested_deps_with_version
 
 
 def fpm_command(pkg_name, setup_py=None, no_python_dependencies=False, extra_args=None, version=None, iteration=0):
@@ -112,7 +120,7 @@ def fpm_command(pkg_name, setup_py=None, no_python_dependencies=False, extra_arg
         fpm_cmd += ['--no-python-dependencies']
 
     if extra_args:
-        fpm_cmd += extra_args\
+        fpm_cmd += extra_args
 
     if setup_py:
         fpm_cmd += [setup_py]
@@ -171,7 +179,9 @@ def _load_module(file_name):
 
 def extend_extra_args(extra_args, dependencies_with_versions):
     log.debug(">> Extending extra args:")
-    for pkg_name, version in dependencies_with_versions.iteritems():
+    if not extra_args:
+            extra_args = []
+    for pkg_name, version in dependencies_with_versions:
         if pkg_name in broken_scheme_names:
             pkg_name = broken_scheme_names[pkg_name]
 
@@ -179,6 +189,7 @@ def extend_extra_args(extra_args, dependencies_with_versions):
             arg = 'python-' + pkg_name + ' >= ' + version
         else:
             arg = 'python-' + pkg_name
+
         extra_args.append('-d')
         extra_args.append(arg)
     log.debug(extra_args)
@@ -187,15 +198,15 @@ def extend_extra_args(extra_args, dependencies_with_versions):
 
 def lookup_versions(dependencies, versions_file):
     log.debug(">> Lookup versions:")
-    dependencies_with_versions = {}
+    dependencies_with_versions = []
     versions_config = ConfigParser.ConfigParser()
     versions_config.read(versions_file)
 
     for dependency in dependencies:
         if versions_config.has_option('versions', dependency):
-            dependencies_with_versions[dependency] = versions_config.get('versions', dependency)
+            dependencies_with_versions.append((dependency, versions_config.get('versions', dependency)))
         else:
-            dependencies_with_versions[dependency] = None
+            dependencies_with_versions.append((dependency, None))
     log.debug(dependencies_with_versions)
     return dependencies_with_versions
 
