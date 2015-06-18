@@ -24,7 +24,8 @@ If you would build these packages with FPM you would end up with the following b
 The vdt.versionplugin.buildout also takes care of this and fixes the affected names for you.
 
 You can use this plugin the following way in your buildout:
-    ```
-    cd src/package-to-build
-    ../../bin/version --plugin=buildout --versions-file=versions.cfg -v
-    ```
+
+```
+cd src/package-to-build
+../../bin/version --plugin=buildout --versions-file=versions.cfg -v
+```
