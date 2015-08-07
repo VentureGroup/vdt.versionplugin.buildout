@@ -16,6 +16,8 @@ from vdt.versionplugin.buildout.shared import build_with_fpm
 from vdt.versionplugin.buildout.shared import ruby_to_json
 from vdt.versionplugin.buildout.shared import read_dependencies_package
 from vdt.versionplugin.buildout.shared import parse_from_dpkg_output
+from vdt.versionplugin.buildout.shared import download_source_distribution_dependencies
+from vdt.versionplugin.buildout.shared import build_source_distribution
 
 
 @pytest.fixture
@@ -134,26 +136,42 @@ def test_build_dependent_packages(monkeypatch, mock_logger):
                             ('paramiko', None)]
 
 
-def test_download_package_with_version(monkeypatch):
+@pytest.mark.parametrize('version, expected_param',
+                         [('1.0.0', 'puka==1.0.0'),
+                          (None, 'puka')])
+def test_download_package(monkeypatch, version, expected_param):
     mock_pip_main = Mock()
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.pip.main', mock_pip_main)
 
-    download_package('puka', '1.0.0', '/tmp/123/')
+    download_package('puka', version, '/tmp/123/')
 
-    expected_call = ['install', '-q', 'puka==1.0.0', '--ignore-installed',
-                     '--no-install', '--build=/tmp/123/']
+    expected_call = ['install', '-q', expected_param, '--ignore-installed', '--download=/tmp/123/']
     mock_pip_main.assert_called_once_with(expected_call)
 
 
-def test_download_package_without_version(monkeypatch):
-    mock_pip_main = Mock()
-    monkeypatch.setattr('vdt.versionplugin.buildout.shared.pip.main', mock_pip_main)
+def test_download_source_distribution_dependencies(monkeypatch):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os',
+                        Mock(**{'getcwd.return_value': sentinel.path}))
+    mock_download_package = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.download_package', mock_download_package)
+    deps_with_versions = [('puka', '1.0.0'), ('mock', '2.0.0'), ('pbr', '3.0.0')]
+    download_source_distribution_dependencies(deps_with_versions)
+    mock_download_package.assert_has_calls([call('puka', '1.0.0', sentinel.path),
+                                           call('mock', '2.0.0', sentinel.path),
+                                           call('pbr', '3.0.0', sentinel.path)])
 
-    download_package('pyyaml', None, '/tmp/123/')
 
-    expected_call = ['install', '-q', 'pyyaml', '--ignore-installed',
-                     '--no-install', '--build=/tmp/123/']
-    mock_pip_main.assert_called_once_with(expected_call)
+def test_build_source_distribution(monkeypatch, mock_logger):
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.os',
+                        Mock(**{'getcwd.return_value': '/home/test/'}))
+    mock_check_output = Mock()
+    monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
+                        mock_check_output)
+
+    build_source_distribution()
+
+    mock_check_output.assert_called_once_with(['python', 'setup.py', 'sdist', '--formats=zip',
+                                                   '--dist-dir=/home/test/'])
 
 
 def test_ruby_to_json(monkeypatch):
@@ -376,8 +394,9 @@ def test_parse_version_extra_args():
     args, extra_args = parse_version_extra_args(['--include', 'test1', '-i', 'test2',
                                                  '--versions-file', '/home/test/versions.cfg',
                                                  '-d', '--test1', '-d', '--test2',
-                                                 '--iteration=1'])
+                                                 '--iteration=1', '--source-distribution=zip'])
     assert sorted(args.include) == sorted(['test1', 'test2'])
     assert args.versions_file == '/home/test/versions.cfg'
     assert args.iteration == '1'
+    assert args.source_distribution == 'zip'
     assert sorted(extra_args) == sorted(['-d', '--test1', '-d', '--test2'])

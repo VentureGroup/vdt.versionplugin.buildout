@@ -34,8 +34,8 @@ def download_package(dependency, version, download_dir):
         pip_args = dependency + '==' + version
     else:
         pip_args = dependency
-    pip.main(['install', '-q', pip_args, '--ignore-installed', '--no-install',
-        '--build=' + download_dir])
+
+    pip.main(['install', '-q', pip_args, '--ignore-installed', '--download=' + download_dir])
 
 
 def build_with_fpm(package_name, setup_py=None, extra_args=None, version=None, no_python_dependencies=True):
@@ -98,6 +98,18 @@ def build_dependent_packages(deps_with_versions, versions_file):
             pass
 
     return nested_deps_with_version
+
+
+def download_source_distribution_dependencies(deps_with_versions):
+    for package_name, version in deps_with_versions:
+        download_package(package_name, version, os.getcwd())
+
+
+def build_source_distribution():
+    dist_cmd = ['python', 'setup.py', 'sdist', '--formats=zip', '--dist-dir=' + os.getcwd()]
+    log.debug("Running command {0}".format(" ".join(dist_cmd)))
+    dist_cmd_output = subprocess.check_output(dist_cmd)
+    log.debug(dist_cmd_output)
 
 
 def fpm_command(pkg_name, setup_py=None, no_python_dependencies=False, extra_args=None, version=None, iteration=0):
@@ -231,6 +243,8 @@ def parse_version_extra_args(version_args):
                              " multiple packages")
     parser.add_argument('--versions-file', help='Buildout versions.cfg')
     parser.add_argument('--iteration', help="The iteration number for a hotfix")
+    parser.add_argument('--source-distribution', help="Creates an additional source distribution"
+                                                      "and its dependencies")
     args, extra_args = parser.parse_known_args(version_args)
     
     return args, extra_args
