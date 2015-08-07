@@ -394,9 +394,9 @@ def test_parse_version_extra_args():
     args, extra_args = parse_version_extra_args(['--include', 'test1', '-i', 'test2',
                                                  '--versions-file', '/home/test/versions.cfg',
                                                  '-d', '--test1', '-d', '--test2',
-                                                 '--iteration=1', '--source-distribution=zip'])
+                                                 '--iteration=1', '--source-distribution'])
     assert sorted(args.include) == sorted(['test1', 'test2'])
     assert args.versions_file == '/home/test/versions.cfg'
     assert args.iteration == '1'
-    assert args.source_distribution == 'zip'
+    assert args.source_distribution == True
     assert sorted(extra_args) == sorted(['-d', '--test1', '-d', '--test2'])

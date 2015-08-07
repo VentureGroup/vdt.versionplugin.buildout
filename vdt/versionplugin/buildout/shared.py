@@ -243,8 +243,10 @@ def parse_version_extra_args(version_args):
                              " multiple packages")
     parser.add_argument('--versions-file', help='Buildout versions.cfg')
     parser.add_argument('--iteration', help="The iteration number for a hotfix")
-    parser.add_argument('--source-distribution', help="Creates an additional source distribution"
-                                                      "and its dependencies")
+    parser.add_argument('--source-distribution',
+                        help="Creates an additional source distribution and its dependencies",
+                        action='store_true',
+                        default=False)
     args, extra_args = parser.parse_known_args(version_args)
     
     return args, extra_args
