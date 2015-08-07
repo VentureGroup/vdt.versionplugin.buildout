@@ -170,8 +170,8 @@ def test_build_source_distribution(monkeypatch, mock_logger):
 
     build_source_distribution()
 
-    mock_check_output.assert_called_once_with(['python', 'setup.py', 'sdist', '--formats=zip',
-                                                   '--dist-dir=/home/test/'])
+    mock_check_output.assert_called_once_with(['python', 'setup.py', 'bdist_wheel',
+                                               '--dist-dir=/home/test/'])
 
 
 def test_ruby_to_json(monkeypatch):

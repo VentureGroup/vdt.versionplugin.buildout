@@ -106,7 +106,7 @@ def download_source_distribution_dependencies(deps_with_versions):
 
 
 def build_source_distribution():
-    dist_cmd = ['python', 'setup.py', 'sdist', '--formats=zip', '--dist-dir=' + os.getcwd()]
+    dist_cmd = ['python', 'setup.py', 'bdist_wheel', '--dist-dir=' + os.getcwd()]
     log.debug("Running command {0}".format(" ".join(dist_cmd)))
     dist_cmd_output = subprocess.check_output(dist_cmd)
     log.debug(dist_cmd_output)
