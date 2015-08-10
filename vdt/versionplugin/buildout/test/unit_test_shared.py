@@ -16,8 +16,8 @@ from vdt.versionplugin.buildout.shared import build_with_fpm
 from vdt.versionplugin.buildout.shared import ruby_to_json
 from vdt.versionplugin.buildout.shared import read_dependencies_package
 from vdt.versionplugin.buildout.shared import parse_from_dpkg_output
-from vdt.versionplugin.buildout.shared import download_source_distribution_dependencies
-from vdt.versionplugin.buildout.shared import build_source_distribution
+from vdt.versionplugin.buildout.shared import download_bdist_dependencies
+from vdt.versionplugin.buildout.shared import build_bdist
 
 
 @pytest.fixture
@@ -149,26 +149,26 @@ def test_download_package(monkeypatch, version, expected_param):
     mock_pip_main.assert_called_once_with(expected_call)
 
 
-def test_download_source_distribution_dependencies(monkeypatch):
+def test_download_bdist_dependencies(monkeypatch):
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.os',
                         Mock(**{'getcwd.return_value': sentinel.path}))
     mock_download_package = Mock()
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.download_package', mock_download_package)
     deps_with_versions = [('puka', '1.0.0'), ('mock', '2.0.0'), ('pbr', '3.0.0')]
-    download_source_distribution_dependencies(deps_with_versions)
+    download_bdist_dependencies(deps_with_versions)
     mock_download_package.assert_has_calls([call('puka', '1.0.0', sentinel.path),
                                            call('mock', '2.0.0', sentinel.path),
                                            call('pbr', '3.0.0', sentinel.path)])
 
 
-def test_build_source_distribution(monkeypatch, mock_logger):
+def test_build_bdist(monkeypatch, mock_logger):
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.os',
                         Mock(**{'getcwd.return_value': '/home/test/'}))
     mock_check_output = Mock()
     monkeypatch.setattr('vdt.versionplugin.buildout.shared.subprocess.check_output',
                         mock_check_output)
 
-    build_source_distribution()
+    build_bdist()
 
     mock_check_output.assert_called_once_with(['python', 'setup.py', 'bdist_wheel',
                                                '--dist-dir=/home/test/'])
@@ -394,9 +394,9 @@ def test_parse_version_extra_args():
     args, extra_args = parse_version_extra_args(['--include', 'test1', '-i', 'test2',
                                                  '--versions-file', '/home/test/versions.cfg',
                                                  '-d', '--test1', '-d', '--test2',
-                                                 '--iteration=1', '--source-distribution'])
+                                                 '--iteration=1', '--bdist'])
     assert sorted(args.include) == sorted(['test1', 'test2'])
     assert args.versions_file == '/home/test/versions.cfg'
     assert args.iteration == '1'
-    assert args.source_distribution == True
+    assert args.bdist == True
     assert sorted(extra_args) == sorted(['-d', '--test1', '-d', '--test2'])

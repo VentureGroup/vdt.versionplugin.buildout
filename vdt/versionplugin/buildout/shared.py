@@ -100,12 +100,12 @@ def build_dependent_packages(deps_with_versions, versions_file):
     return nested_deps_with_version
 
 
-def download_source_distribution_dependencies(deps_with_versions):
+def download_bdist_dependencies(deps_with_versions):
     for package_name, version in deps_with_versions:
         download_package(package_name, version, os.getcwd())
 
 
-def build_source_distribution():
+def build_bdist():
     dist_cmd = ['python', 'setup.py', 'bdist_wheel', '--dist-dir=' + os.getcwd()]
     log.debug("Running command {0}".format(" ".join(dist_cmd)))
     dist_cmd_output = subprocess.check_output(dist_cmd)
@@ -243,7 +243,7 @@ def parse_version_extra_args(version_args):
                              " multiple packages")
     parser.add_argument('--versions-file', help='Buildout versions.cfg')
     parser.add_argument('--iteration', help="The iteration number for a hotfix")
-    parser.add_argument('--source-distribution',
+    parser.add_argument('--bdist',
                         help="Creates an additional source distribution and its dependencies",
                         action='store_true',
                         default=False)
