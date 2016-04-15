@@ -18,10 +18,7 @@ setup(name=pkgname,
           "setuptools",
           "vdt.version",
           "vdt.versionplugin.default",
+          "mock"
       ],
       entry_points={},
-      extras_require={
-          'test': [
-              'mock',
-          ]
-      })
+      )
