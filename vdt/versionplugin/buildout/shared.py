@@ -94,7 +94,7 @@ def build_dependent_packages(deps_with_versions, versions_file):
                 for dep_with_version in temp_deps_with_versions:
                     if dep_with_version not in nested_deps_with_version:
                         nested_deps_with_version.append(dep_with_version)
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as error:
             pass
 
     return nested_deps_with_version
@@ -127,6 +127,7 @@ def fpm_command(pkg_name, setup_py=None, no_python_dependencies=False, extra_arg
                 '--exclude=*.pyo', '--depends=python', '--category=python',
                 '--python-bin=/usr/bin/python', '--template-scripts',
                 '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                '--deb-no-default-config-files',
                 '--python-install-bin=/usr/local/bin/', '--before-remove=' + pre_remove_script]
     if no_python_dependencies:
         fpm_cmd += ['--no-python-dependencies']

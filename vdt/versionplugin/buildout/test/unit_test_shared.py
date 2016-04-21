@@ -228,6 +228,7 @@ def test_fpm_command_dependencies_and_extra_args(monkeypatch):
                        '--category=python', '--python-bin=/usr/bin/python',
                        '--template-scripts',
                        '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--deb-no-default-config-files',
                        '--python-install-bin=/usr/local/bin/',
                        '--before-remove=files/preremove', '--no-python-dependencies',
                        '-d', 'test', './home/test/setup.py']
@@ -247,6 +248,7 @@ def test_fpm_command_dependencies_and_no_extra_args(monkeypatch):
                        '--category=python', '--python-bin=/usr/bin/python',
                        '--template-scripts',
                        '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--deb-no-default-config-files',
                        '--python-install-bin=/usr/local/bin/',
                        '--before-remove=files/preremove', '--no-python-dependencies',
                        './home/test/setup.py']
@@ -265,6 +267,7 @@ def test_fpm_command_no_dependencies_and_no_extra_args(monkeypatch):
                        '--category=python', '--python-bin=/usr/bin/python',
                        '--template-scripts',
                        '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--deb-no-default-config-files',
                        '--python-install-bin=/usr/local/bin/',
                        '--before-remove=files/preremove', './home/test/setup.py']
 
@@ -282,6 +285,7 @@ def test_fpm_command_broken_scheme(monkeypatch):
                        '--depends=python', '--category=python', '--python-bin=/usr/bin/python',
                        '--template-scripts',
                        '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--deb-no-default-config-files',
                        '--python-install-bin=/usr/local/bin/',
                        '--before-remove=files/preremove', './home/test/setup.py']
 
@@ -299,6 +303,7 @@ def test_fpm_command_version(monkeypatch):
                        '--exclude=*.pyo', '--depends=python', '--category=python',
                        '--python-bin=/usr/bin/python', '--template-scripts',
                        '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--deb-no-default-config-files',
                        '--python-install-bin=/usr/local/bin/',
                        '--before-remove=files/preremove', './home/test/setup.py']
 
@@ -316,6 +321,7 @@ def test_fpm_command_version_hotfix(monkeypatch):
                        '--exclude=*.pyo', '--depends=python', '--category=python',
                        '--python-bin=/usr/bin/python', '--template-scripts',
                        '--python-install-lib=/usr/lib/python2.7/dist-packages/',
+                       '--deb-no-default-config-files',
                        '--python-install-bin=/usr/local/bin/',
                        '--before-remove=files/preremove', './home/test/setup.py']
 
