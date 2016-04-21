@@ -45,8 +45,9 @@ def lookup_versions(versions_file):
 
 
 class PinnedRequirementSet(RequirementSet):
-    def __init__(self, versions, *args, **kwargs):
+    def __init__(self, versions, file_filter, *args, **kwargs):
         self.versions = versions
+        self.file_filter = file_filter
         super(PinnedRequirementSet, self).__init__(*args, **kwargs)
 
     def add_requirement(self, install_req, parent_req_name=None):
@@ -54,13 +55,18 @@ class PinnedRequirementSet(RequirementSet):
         if name in self.versions:
             pinned_version = "%s==%s" % (name, self.versions.get(name))
             install_req.req = pkg_resources.Requirement.parse(pinned_version)
-
-        return super(PinnedRequirementSet, self).add_requirement(install_req, parent_req_name)
-
+        if name and self.file_filter.is_filtered(name):
+            return [] 
+        return super(PinnedRequirementSet, self).add_requirement(
+            install_req, parent_req_name)
 
 class PinnedVersionPackageBuilder(PackageBuilder):
     def download_dependencies(self, install_dir, deb_dir):
         versions = lookup_versions(self.args.versions_file)
-        foo = functools.partial(PinnedRequirementSet, versions)
+        # we have a file filter in the PackageBuilder, so we can skip the
+        # download if we want to
+        foo = functools.partial(
+            PinnedRequirementSet, versions, self.file_filter)
         with mock.patch('pip.commands.download.RequirementSet', foo):
             return super(PinnedVersionPackageBuilder, self).download_dependencies(install_dir, deb_dir)
+
