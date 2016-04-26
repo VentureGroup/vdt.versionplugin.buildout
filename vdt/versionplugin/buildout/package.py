@@ -22,11 +22,17 @@ def build_package(version):
 
     with version.checkout_tag:
         deb_dir = getcwd()
+
+        if args.iteration is not None:
+            version_string = "%s.%s" % (version, args.iteration)
+        else:
+            version_string = str(version)
+
         log.debug("Building {0} version {1} with "
-              "vdt.versionplugin.buildout".format(basename(deb_dir), version))
+              "vdt.versionplugin.buildout".format(basename(deb_dir), version_string))
 
         # use a package build class which has all kinds of hooks.
-        builder = PinnedVersionPackageBuilder(version, args, extra_args, deb_dir)
+        builder = PinnedVersionPackageBuilder(version_string, args, extra_args, deb_dir)
         builder.build_package_and_dependencies()
         return builder.exit_code
 

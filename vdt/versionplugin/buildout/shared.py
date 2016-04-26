@@ -41,8 +41,6 @@ def parse_version_extra_args(version_args):
 def lookup_versions(versions_file):
     versions_config = ConfigParser.ConfigParser()
     versions_config.read(versions_file)
-    log.debug(dir(versions_config))
-    log.debug(versions_config.items('versions'))
     return dict(versions_config.items('versions'))
 
 
