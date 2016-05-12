@@ -51,7 +51,7 @@ class PinnedRequirementSet(RequirementSet):
         super(PinnedRequirementSet, self).__init__(*args, **kwargs)
 
     def add_requirement(self, install_req, parent_req_name=None):
-        name = install_req.name
+        name = install_req.name.lower() if install_req.name else None
         if name in self.versions:
             pinned_version = "%s==%s" % (name, self.versions.get(name))
             install_req.req = pkg_resources.Requirement.parse(pinned_version)
@@ -59,6 +59,7 @@ class PinnedRequirementSet(RequirementSet):
             return [] 
         return super(PinnedRequirementSet, self).add_requirement(
             install_req, parent_req_name)
+
 
 class PinnedVersionPackageBuilder(PackageBuilder):
     def download_dependencies(self, install_dir, deb_dir):
@@ -69,4 +70,3 @@ class PinnedVersionPackageBuilder(PackageBuilder):
             PinnedRequirementSet, versions, self.file_filter)
         with mock.patch('pip.commands.download.RequirementSet', foo):
             return super(PinnedVersionPackageBuilder, self).download_dependencies(install_dir, deb_dir)
-
