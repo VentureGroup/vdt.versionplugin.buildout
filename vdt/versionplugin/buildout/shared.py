@@ -16,18 +16,10 @@ from vdt.versionplugin.debianize.shared import (
     DebianizeArgumentParser
 )
 
-from vdt.versionplugin.debianize.config import PACKAGE_TYPES
+from vdt.versionplugin.debianize.config import PACKAGE_TYPE_CHOICES
 
 
 log = logging.getLogger(__name__)
-
-PACKAGE_TYPES.update({
-    'wheel':
-        {
-            'broken_scheme_names': {},
-            'glob': '*.whl'
-        }
-})
 
 
 class BuildoutArgumentParser(DebianizeArgumentParser):
@@ -37,6 +29,11 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p = super(BuildoutArgumentParser, self).get_parser()
         p.add_argument('--versions-file', help='Buildout versions.cfg')
         p.add_argument('--iteration', help="The iteration number for a hotfix")
+        # override this so we accept wheels
+        p.add_argument(
+            '--target', '-t', default='deb',
+            choices=PACKAGE_TYPE_CHOICES + ["wheel"],
+            help='the type of package you want to create (deb, rpm, etc)')
         return p
 
 
@@ -101,9 +98,10 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                 PinnedVersionPackageBuilder, self).download_dependencies(
                     install_dir, deb_dir)
 
-    def build_dependency(self, args, extra_args, path, package_dir, deb_dir, dependency_builder=None):
+    def build_dependency(self, args, extra_args, path, package_dir, deb_dir, glob_pattern=None, dependency_builder=None):
         if args.target == 'wheel':
             dependency_builder = build_from_python_source_with_wheel
+            glob_pattern = "*.whl"
 
         super(PinnedVersionPackageBuilder, self).build_dependency(
-            args, extra_args, path, package_dir, deb_dir, dependency_builder)
+            args, extra_args, path, package_dir, deb_dir, glob_pattern, dependency_builder)
