@@ -8,6 +8,7 @@ from vdt.versionplugin.buildout.shared import (
     delete_old_packages
 )
 
+from vdt.versionplugin.wheel.package import build_package as build_wheel
 
 log = logging.getLogger(__name__)
 
@@ -28,13 +29,20 @@ def build_package(version):
         else:
             version_string = str(version)
 
-        log.debug("Building {0} version {1} with "
-              "vdt.versionplugin.buildout".format(basename(deb_dir), version_string))
+        log.debug(
+            "Building {0} version {1} with "
+            "vdt.versionplugin.buildout".format(
+                basename(deb_dir), version_string))
 
         # use a package build class which has all kinds of hooks.
         builder = PinnedVersionPackageBuilder(version_string, args, extra_args, deb_dir)
-        builder.build_package_and_dependencies()
-        return builder.exit_code
+        exit_code = 0
+        if args.target == 'wheel':
+            exit_code = build_wheel(version)
+            builder.build_dependencies(version, args, extra_args, deb_dir)
+        else:
+            builder.build_package_and_dependencies()
+        return builder.exit_code or exit_code
 
     return 0
 
