@@ -16,12 +16,12 @@ from vdt.versionplugin.debianize.shared import (
     DebianizeArgumentParser
 )
 
-import vdt.versionplugin.debianize.config as config
+from vdt.versionplugin.debianize.config import PACKAGE_TYPES
 
 
 log = logging.getLogger(__name__)
 
-config.PACKAGE_TYPES.update({
+PACKAGE_TYPES.update({
     'wheel':
         {
             'broken_scheme_names': {},
@@ -70,7 +70,7 @@ class PinnedRequirementSet(RequirementSet):
             pinned_version = "%s==%s" % (name, self.versions.get(name))
             install_req.req = pkg_resources.Requirement.parse(pinned_version)
         if name and self.file_filter.is_filtered(name):
-            return [] 
+            return []
         return super(PinnedRequirementSet, self).add_requirement(
             install_req, parent_req_name)
 
