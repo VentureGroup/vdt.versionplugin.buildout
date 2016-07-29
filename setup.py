@@ -19,6 +19,7 @@ setup(name=pkgname,
           "vdt.version",
           "vdt.versionplugin.default",
           "vdt.versionplugin.debianize>=1.0.0",
+          "vdt.versionplugin.wheel",
           "mock"
       ],
       entry_points={},

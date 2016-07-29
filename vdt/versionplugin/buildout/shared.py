@@ -3,15 +3,21 @@ import functools
 import logging
 import glob
 import ConfigParser
+import subprocess
+import shutil
 
 import mock
 from pip.req import RequirementSet, InstallRequirement
 from pip._vendor import pkg_resources
 
+from vdt.version.utils import change_directory
 from vdt.versionplugin.debianize.shared import (
     PackageBuilder,
     DebianizeArgumentParser
 )
+
+from vdt.versionplugin.debianize.config import PACKAGE_TYPE_CHOICES
+
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +29,11 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p = super(BuildoutArgumentParser, self).get_parser()
         p.add_argument('--versions-file', help='Buildout versions.cfg')
         p.add_argument('--iteration', help="The iteration number for a hotfix")
+        # override this so we accept wheels
+        p.add_argument(
+            '--target', '-t', default='deb',
+            choices=PACKAGE_TYPE_CHOICES + ["wheel"],
+            help='the type of package you want to create (deb, rpm, etc)')
         return p
 
 
@@ -56,9 +67,23 @@ class PinnedRequirementSet(RequirementSet):
             pinned_version = "%s==%s" % (name, self.versions.get(name))
             install_req.req = pkg_resources.Requirement.parse(pinned_version)
         if name and self.file_filter.is_filtered(name):
-            return [] 
+            return []
         return super(PinnedRequirementSet, self).add_requirement(
             install_req, parent_req_name)
+
+
+def build_from_python_source_with_wheel(args, extra_args, target_path=None, version=None, file_name=None):
+    target_wheel_dir = os.path.join(os.getcwd(), 'dist')
+    with change_directory(target_path):
+        try:
+            cmd = ['pip', 'wheel', '.', '--no-deps', '--wheel-dir', target_wheel_dir]  # noqa
+            log.debug("Running command {0}".format(" ".join(cmd)))
+            log.debug(subprocess.check_output(cmd, cwd=target_path))
+        except subprocess.CalledProcessError as e:
+            log.error("failed to build with wheel status code %s\n%s" % (
+                e.returncode, e.output
+            ))
+            return 1
 
 
 class PinnedVersionPackageBuilder(PackageBuilder):
@@ -69,4 +94,14 @@ class PinnedVersionPackageBuilder(PackageBuilder):
         foo = functools.partial(
             PinnedRequirementSet, versions, self.file_filter)
         with mock.patch('pip.commands.download.RequirementSet', foo):
-            return super(PinnedVersionPackageBuilder, self).download_dependencies(install_dir, deb_dir)
+            return super(
+                PinnedVersionPackageBuilder, self).download_dependencies(
+                    install_dir, deb_dir)
+
+    def build_dependency(self, args, extra_args, path, package_dir, deb_dir, glob_pattern=None, dependency_builder=None):
+        if args.target == 'wheel':
+            dependency_builder = build_from_python_source_with_wheel
+            glob_pattern = "*.whl"
+
+        super(PinnedVersionPackageBuilder, self).build_dependency(
+            args, extra_args, path, package_dir, deb_dir, glob_pattern, dependency_builder)
