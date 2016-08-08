@@ -32,7 +32,8 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p.add_argument(
             '--pin-versions', default=False, action='store_true',
             help="Pin all dependencies in the debian control file with the "
-                 "exact versions from versions-file (.deb only)")
+                 "exact versions from versions-file, and from "
+                 "dependencies of dependencies (.deb only)")
 
         # override this so we accept wheels
         p.add_argument(
