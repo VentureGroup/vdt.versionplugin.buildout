@@ -7,7 +7,7 @@ import subprocess
 import shutil
 
 import mock
-from pip.req import RequirementSet, InstallRequirement
+from pip.req import RequirementSet, parse_requirements
 from pip._vendor import pkg_resources
 
 from vdt.version.utils import change_directory
@@ -29,7 +29,11 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p = super(BuildoutArgumentParser, self).get_parser()
         p.add_argument('--versions-file', help='Buildout versions.cfg')
         p.add_argument('--iteration', help="The iteration number for a hotfix")
-        p.add_argument('--pin-versions', default=False, action='store_true', help="Pin all dependencies with exact versions from versions-file (.deb only)")
+        p.add_argument(
+            '--pin-versions', default=False, action='store_true',
+            help="Pin all dependencies in the debian control file with the "
+                 "exact versions from versions-file (.deb only)")
+
         # override this so we accept wheels
         p.add_argument(
             '--target', '-t', default='deb',
@@ -73,7 +77,8 @@ class PinnedRequirementSet(RequirementSet):
             install_req, parent_req_name)
 
 
-def build_from_python_source_with_wheel(args, extra_args, target_path=None, version=None, file_name=None):
+def build_from_python_source_with_wheel(
+        args, extra_args, target_path=None, version=None, file_name=None):
     target_wheel_dir = os.path.join(os.getcwd(), 'dist')
     with change_directory(target_path):
         try:
@@ -85,6 +90,36 @@ def build_from_python_source_with_wheel(args, extra_args, target_path=None, vers
                 e.returncode, e.output
             ))
             return 1
+
+
+def requirements_from_egg_info(directory):
+    "As buildout always uses eggs, so we get the requirements from it"
+    egg_info_glob = glob.glob(os.path.join(directory, "*.egg-info"))
+    if egg_info_glob:
+        try:
+            versions_file = os.path.join(egg_info_glob[0], "requires.txt")
+            if os.path.exists(versions_file):
+                install_reqs = parse_requirements(versions_file, session=False)
+                return [req.name for req in install_reqs]
+        except IOError:
+            log.warning(
+                "failed to get requires.txt from %s" % egg_info_glob[0])
+
+
+def write_requirements_txt(directory, requirements, versions):
+    """
+    FPM supports a flag --python-obey-requirements-txt, so
+    we use that functionality
+    """
+    requirements_txt = os.path.join(directory, "requirements.txt")
+    with open(requirements_txt, "wb") as f:
+        for requirement in requirements:
+            if requirement in versions:
+                # we found an exact version from versions.cfg
+                f.write("%s==%s\n" % (requirement, versions[requirement]))
+            else:
+                # add it as a dependency without a specific version
+                f.write("%s\n" % requirement)
 
 
 class PinnedVersionPackageBuilder(PackageBuilder):
@@ -101,7 +136,14 @@ class PinnedVersionPackageBuilder(PackageBuilder):
 
     def build_package(self, version, args, extra_args):
         if self.args.pin_versions:
-            pass
+            requirements = requirements_from_egg_info(self.directory)
+
+            if requirements is not None:
+                # we write a debian control file like this with the exact
+                # versions
+                versions = lookup_versions(self.args.versions_file)
+                write_requirements_txt(self.directory, requirements, versions)
+                extra_args.append("--python-obey-requirements-txt")
 
         super(PinnedVersionPackageBuilder, self).build_package(
             version, args, extra_args)
