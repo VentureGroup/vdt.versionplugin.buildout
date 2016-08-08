@@ -92,34 +92,18 @@ def build_from_python_source_with_wheel(
             return 1
 
 
-def requirements_from_egg_info(directory):
-    "As buildout always uses eggs, so we get the requirements from it"
-    egg_info_glob = glob.glob(os.path.join(directory, "*.egg-info"))
-    if egg_info_glob:
-        try:
-            versions_file = os.path.join(egg_info_glob[0], "requires.txt")
-            if os.path.exists(versions_file):
-                install_reqs = parse_requirements(versions_file, session=False)
-                return [req.name for req in install_reqs]
-        except IOError:
-            log.warning(
-                "failed to get requires.txt from %s" % egg_info_glob[0])
-
-
-def write_requirements_txt(directory, requirements, versions):
+def write_requirements_txt(directory, requirements):
     """
     FPM supports a flag --python-obey-requirements-txt, so
-    we use that functionality
+    we use that functionality.
+    We save the exact version from versions.cfg, which
+    is also downloaded. Note that these included dependencies
+    of dependencies
     """
     requirements_txt = os.path.join(directory, "requirements.txt")
     with open(requirements_txt, "wb") as f:
         for requirement in requirements:
-            if requirement in versions:
-                # we found an exact version from versions.cfg
-                f.write("%s==%s\n" % (requirement, versions[requirement]))
-            else:
-                # add it as a dependency without a specific version
-                f.write("%s\n" % requirement)
+            f.write("%s==%s\n" % (requirement, requirements[requirement]))
 
 
 class PinnedVersionPackageBuilder(PackageBuilder):
@@ -135,15 +119,19 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                     install_dir, deb_dir)
 
     def build_package(self, version, args, extra_args):
-        if self.args.pin_versions:
-            requirements = requirements_from_egg_info(self.directory)
+        if self.args.pin_versions and self.downloaded_req_set is not None:
+            # we want the exact versions which are downloaded
 
-            if requirements is not None:
-                # we write a debian control file like this with the exact
-                # versions
-                versions = lookup_versions(self.args.versions_file)
-                write_requirements_txt(self.directory, requirements, versions)
-                extra_args.append("--python-obey-requirements-txt")
+            downloaded_versions = {}
+
+            # skip ourselves
+            for install_req in self.downloaded_req_set.requirements.values()[1:]:  # noqa
+                downloaded_versions[
+                    install_req.name] = install_req.req.specs[0][1]
+
+            write_requirements_txt(
+                self.directory, downloaded_versions)
+            extra_args.append("--python-obey-requirements-txt")
 
         super(PinnedVersionPackageBuilder, self).build_package(
             version, args, extra_args)
