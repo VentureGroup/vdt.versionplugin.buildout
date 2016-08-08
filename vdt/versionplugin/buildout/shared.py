@@ -98,8 +98,8 @@ def write_requirements_txt(directory, requirements):
     FPM supports a flag --python-obey-requirements-txt, so
     we use that functionality.
     We save the exact version from versions.cfg, which
-    is also downloaded. Note that these included dependencies
-    of dependencies
+    is also downloaded. Note that these include versions of dependencies
+    of dependencies as well.
     """
     requirements_txt = os.path.join(directory, "requirements.txt")
     with open(requirements_txt, "wb") as f:
