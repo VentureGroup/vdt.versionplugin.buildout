@@ -29,6 +29,7 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p = super(BuildoutArgumentParser, self).get_parser()
         p.add_argument('--versions-file', help='Buildout versions.cfg')
         p.add_argument('--iteration', help="The iteration number for a hotfix")
+        p.add_argument('--pin-versions', default=False, action='store_true', help="Pin all dependencies with exact versions from versions-file (.deb only)")
         # override this so we accept wheels
         p.add_argument(
             '--target', '-t', default='deb',
@@ -98,10 +99,18 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                 PinnedVersionPackageBuilder, self).download_dependencies(
                     install_dir, deb_dir)
 
+    def build_package(self, version, args, extra_args):
+        if self.args.pin_versions:
+            pass
+
+        super(PinnedVersionPackageBuilder, self).build_package(
+            version, args, extra_args)
+
     def build_dependency(self, args, extra_args, path, package_dir, deb_dir, glob_pattern=None, dependency_builder=None):
         if args.target == 'wheel':
             dependency_builder = build_from_python_source_with_wheel
             glob_pattern = "*.whl"
 
         super(PinnedVersionPackageBuilder, self).build_dependency(
-            args, extra_args, path, package_dir, deb_dir, glob_pattern, dependency_builder)
+            args, extra_args, path, package_dir, deb_dir, glob_pattern,
+            dependency_builder)
