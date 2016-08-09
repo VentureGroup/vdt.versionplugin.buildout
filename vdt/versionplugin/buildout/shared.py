@@ -7,7 +7,7 @@ import subprocess
 import shutil
 
 import mock
-from pip.req import RequirementSet, parse_requirements
+from pip.req import RequirementSet
 from pip._vendor import pkg_resources
 
 from vdt.version.utils import change_directory
