@@ -31,10 +31,8 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p.add_argument('--iteration', help="The iteration number for a hotfix")
         p.add_argument(
             '--pin-versions', default=False, action='store_true',
-            help="Pin all dependencies in the debian control file with the "
-                 "exact versions from versions-file, and from "
-                 "dependencies of dependencies (.deb only)")
-
+            help="Pin exact versions in the generated debian control file, "
+                 "including dependencies of dependencies.")
         # override this so we accept wheels
         p.add_argument(
             '--target', '-t', default='deb',
