@@ -77,6 +77,15 @@ class PinnedRequirementSet(RequirementSet):
         return super(PinnedRequirementSet, self).add_requirement(
             install_req, parent_req_name)
 
+    def requirement_versions(self):
+        versions = {}
+        for install_req in self.requirements.values():
+            # when comes_from is not set it is a dependency to ourselves. So
+            # skip that
+            if install_req.comes_from:
+                versions[install_req.name] = install_req.req.specs[0][1]
+        return versions
+
 
 def build_from_python_source_with_wheel(
         args, extra_args, target_path=None, version=None, file_name=None):
@@ -94,17 +103,11 @@ def build_from_python_source_with_wheel(
 
 
 def write_requirements_txt(directory, requirements):
-    """
-    FPM supports a flag --python-obey-requirements-txt, so
-    we use that functionality.
-    We save the exact version from versions.cfg, which
-    is also downloaded. Note that these include versions of dependencies
-    of dependencies as well.
-    """
     requirements_txt = os.path.join(directory, "requirements.txt")
+    versions = ["%s==%s" % (
+        package, version) for package, version in requirements.items()]
     with open(requirements_txt, "wb") as f:
-        for requirement in requirements:
-            f.write("%s==%s\n" % (requirement, requirements[requirement]))
+        f.write("\n".join(versions))
 
 
 class PinnedVersionPackageBuilder(PackageBuilder):
@@ -121,17 +124,12 @@ class PinnedVersionPackageBuilder(PackageBuilder):
 
     def build_package(self, version, args, extra_args):
         if self.args.pin_versions and self.downloaded_req_set is not None:
-            # we want the exact versions which are downloaded
-
-            downloaded_versions = {}
-
-            # skip ourselves
-            for install_req in self.downloaded_req_set.requirements.values()[1:]:  # noqa
-                downloaded_versions[
-                    install_req.name] = install_req.req.specs[0][1]
-
+            # we want the exact versions from our downloaded requirement_set
+            # and put it in the debian control file, so let's write a
+            # requirements.txt file and say to FPM to use it
             write_requirements_txt(
-                self.directory, downloaded_versions)
+                self.directory, self.downloaded_req_set.requirement_versions())
+
             extra_args.append("--python-obey-requirements-txt")
 
         super(PinnedVersionPackageBuilder, self).build_package(
