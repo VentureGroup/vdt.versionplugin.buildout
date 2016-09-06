@@ -4,7 +4,7 @@ import logging
 import glob
 import ConfigParser
 import subprocess
-import shutil
+import setupreader
 
 import mock
 from pip.req import RequirementSet
@@ -100,12 +100,16 @@ def build_from_python_source_with_wheel(
             return 1
 
 
-def write_requirements_txt(directory, requirements):
+def write_requirements_txt(directory, pinned_requirements, specs_requirements):
     requirements_txt = os.path.join(directory, "requirements.txt")
-    versions = ["%s==%s" % (
-        package, version) for package, version in requirements.items()]
+    result = []
+    for package, version in pinned_requirements.items():
+        if package in specs_requirements:
+            result.append(specs_requirements[package])
+        else:
+            result.append("%s==%s" % (package, version))
     with open(requirements_txt, "wb") as f:
-        f.write("\n".join(versions))
+        f.write("\n".join(result))
 
 
 class PinnedVersionPackageBuilder(PackageBuilder):
@@ -125,8 +129,21 @@ class PinnedVersionPackageBuilder(PackageBuilder):
             # we want the exact versions from our downloaded requirement_set
             # and put it in the debian control file, so let's write a
             # requirements.txt file and say to FPM to use it
+            downloaded_requirements = \
+                self.downloaded_req_set.requirement_versions()
+
+            # however, when we specify a version in setup_py,
+            # we want to use that one
+            setup_py = setupreader.load('setup.py')
+            package_requirements = list(pkg_resources.parse_requirements(
+                setup_py['install_requires']))
+
+            # when 'specs' is defined, we have a dependency specified (>=1.0.0)
+            specs_requirements = {
+                x.project_name: x.__str__() for x in package_requirements if x.specs}  # noqa
+
             write_requirements_txt(
-                self.directory, self.downloaded_req_set.requirement_versions())
+                self.directory, downloaded_requirements, specs_requirements)
 
             extra_args.append("--python-obey-requirements-txt")
 
