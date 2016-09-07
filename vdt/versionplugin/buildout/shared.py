@@ -146,8 +146,8 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                 PinnedVersionPackageBuilder, self).download_dependencies(
                     install_dir, deb_dir)
 
-    def build_package(self, version, args, extra_args):
-        if self.args.pin_versions:
+    def build_pinned_package(self, version, args, extra_args):
+        try:
             # we want the exact versions from our downloaded requirement_set
             # so let's create a requirements.txt file and say to FPM to use it
             downloaded_requirements = \
@@ -169,12 +169,17 @@ class PinnedVersionPackageBuilder(PackageBuilder):
 
             extra_args.append("--python-obey-requirements-txt")
 
-        super(PinnedVersionPackageBuilder, self).build_package(
-            version, args, extra_args)
-
-        if self.args.pin_versions:
-            # cleanup
+            super(PinnedVersionPackageBuilder, self).build_package(
+                version, args, extra_args)
+        finally:
             delete_requirements_txt(self.directory)
+
+    def build_package(self, version, args, extra_args):
+        if self.args.pin_versions:
+            self.build_pinned_package(version, args, extra_args)
+        else:
+            super(PinnedVersionPackageBuilder, self).build_package(
+                version, args, extra_args)
 
     def build_dependency(self, args, extra_args, path, package_dir, deb_dir, glob_pattern=None, dependency_builder=None):
         if args.target == 'wheel':
