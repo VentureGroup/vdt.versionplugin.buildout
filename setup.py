@@ -18,9 +18,10 @@ setup(name=pkgname,
           "setuptools",
           "vdt.version",
           "vdt.versionplugin.default",
-          "vdt.versionplugin.debianize>=1.0.0",
+          "vdt.versionplugin.debianize>=1.0.4",
           "vdt.versionplugin.wheel",
-          "mock"
+          "mock",
+          "setupreader"
       ],
       entry_points={},
       )

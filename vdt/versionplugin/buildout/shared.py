@@ -4,10 +4,10 @@ import logging
 import glob
 import ConfigParser
 import subprocess
-import shutil
+import setupreader
 
 import mock
-from pip.req import RequirementSet, InstallRequirement
+from pip.req import RequirementSet
 from pip._vendor import pkg_resources
 
 from vdt.version.utils import change_directory
@@ -17,6 +17,12 @@ from vdt.versionplugin.debianize.shared import (
 )
 
 from vdt.versionplugin.debianize.config import PACKAGE_TYPE_CHOICES
+
+
+PIN_MARKS = {
+    'equal': "==",
+    'gte': ">="
+}
 
 
 log = logging.getLogger(__name__)
@@ -29,11 +35,24 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p = super(BuildoutArgumentParser, self).get_parser()
         p.add_argument('--versions-file', help='Buildout versions.cfg')
         p.add_argument('--iteration', help="The iteration number for a hotfix")
+
+        p.add_argument(
+            '--pin-exact', action="store_const", const="equal",
+            help="Pin exact versions in the generated debian control file, "
+                 "including dependencies of dependencies.",
+            dest="pin_versions")
+        p.add_argument(
+            '--pin-greater-or-equal', action="store_const", const="gte",
+            help="Pin greater and equal versions in the generated debian"
+                 "control file, including dependencies of dependencies.",
+            dest="pin_versions")
+
         # override this so we accept wheels
         p.add_argument(
             '--target', '-t', default='deb',
             choices=PACKAGE_TYPE_CHOICES + ["wheel"],
             help='the type of package you want to create (deb, rpm, etc)')
+
         return p
 
 
@@ -71,8 +90,18 @@ class PinnedRequirementSet(RequirementSet):
         return super(PinnedRequirementSet, self).add_requirement(
             install_req, parent_req_name)
 
+    def requirement_versions(self):
+        versions = {}
+        for install_req in self.requirements.values():
+            # when comes_from is not set it is a dependency to ourselves. So
+            # skip that
+            if install_req.comes_from:
+                versions[install_req.name] = install_req.req.specs[0][1]
+        return versions
 
-def build_from_python_source_with_wheel(args, extra_args, target_path=None, version=None, file_name=None):
+
+def build_from_python_source_with_wheel(
+        args, extra_args, target_path=None, version=None, file_name=None):
     target_wheel_dir = os.path.join(os.getcwd(), 'dist')
     with change_directory(target_path):
         try:
@@ -84,6 +113,25 @@ def build_from_python_source_with_wheel(args, extra_args, target_path=None, vers
                 e.returncode, e.output
             ))
             return 1
+
+
+def write_requirements_txt(
+        directory, pinned_requirements, specs_requirements, pin_mark="=="):
+    requirements_txt = os.path.join(directory, "requirements.txt")
+    result = []
+    for package, version in pinned_requirements.items():
+        if package in specs_requirements:
+            result.append(specs_requirements[package])
+        else:
+            result.append("%s%s%s" % (package, pin_mark, version))
+    with open(requirements_txt, "wb") as f:
+        f.write("\n".join(result))
+
+
+def delete_requirements_txt(directory):
+    requirements_txt = os.path.join(directory, "requirements.txt")
+    if os.path.exists(requirements_txt):
+        os.remove(requirements_txt)
 
 
 class PinnedVersionPackageBuilder(PackageBuilder):
@@ -98,10 +146,46 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                 PinnedVersionPackageBuilder, self).download_dependencies(
                     install_dir, deb_dir)
 
+    def build_pinned_package(self, version, args, extra_args):
+        try:
+            # we want the exact versions from our downloaded requirement_set
+            # so let's create a requirements.txt file and say to FPM to use it
+            downloaded_requirements = \
+                self.downloaded_req_set.requirement_versions()
+
+            # however, when we specify a version in setup_py,
+            # we want to use that one
+            setup_py = setupreader.load('setup.py')
+            package_requirements = list(pkg_resources.parse_requirements(
+                setup_py['install_requires']))
+
+            # when 'specs' is defined, we have a dependency specified (>=1.0.0)
+            specs_requirements = {
+                x.project_name: x.__str__() for x in package_requirements if x.specs}  # noqa
+
+            write_requirements_txt(
+                self.directory, downloaded_requirements, specs_requirements,
+                PIN_MARKS[self.args.pin_versions])
+
+            extra_args.append("--python-obey-requirements-txt")
+
+            super(PinnedVersionPackageBuilder, self).build_package(
+                version, args, extra_args)
+        finally:
+            delete_requirements_txt(self.directory)
+
+    def build_package(self, version, args, extra_args):
+        if self.args.pin_versions:
+            self.build_pinned_package(version, args, extra_args)
+        else:
+            super(PinnedVersionPackageBuilder, self).build_package(
+                version, args, extra_args)
+
     def build_dependency(self, args, extra_args, path, package_dir, deb_dir, glob_pattern=None, dependency_builder=None):
         if args.target == 'wheel':
             dependency_builder = build_from_python_source_with_wheel
             glob_pattern = "*.whl"
 
         super(PinnedVersionPackageBuilder, self).build_dependency(
-            args, extra_args, path, package_dir, deb_dir, glob_pattern, dependency_builder)
+            args, extra_args, path, package_dir, deb_dir, glob_pattern,
+            dependency_builder)
