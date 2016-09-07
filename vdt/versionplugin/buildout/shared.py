@@ -19,6 +19,12 @@ from vdt.versionplugin.debianize.shared import (
 from vdt.versionplugin.debianize.config import PACKAGE_TYPE_CHOICES
 
 
+PIN_MARKS = {
+    'equal': "==",
+    'gte': ">="
+}
+
+
 log = logging.getLogger(__name__)
 
 
@@ -29,15 +35,24 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         p = super(BuildoutArgumentParser, self).get_parser()
         p.add_argument('--versions-file', help='Buildout versions.cfg')
         p.add_argument('--iteration', help="The iteration number for a hotfix")
+
         p.add_argument(
-            '--pin-versions', default=False, action='store_true',
+            '--pin-exact', action="store_const", const="equal",
             help="Pin exact versions in the generated debian control file, "
-                 "including dependencies of dependencies.")
+                 "including dependencies of dependencies.",
+            dest="pin_versions")
+        p.add_argument(
+            '--pin-greater-or-equal', action="store_const", const="gte",
+            help="Pin greater and equal versions in the generated debian"
+                 "control file, including dependencies of dependencies.",
+            dest="pin_versions")
+
         # override this so we accept wheels
         p.add_argument(
             '--target', '-t', default='deb',
             choices=PACKAGE_TYPE_CHOICES + ["wheel"],
             help='the type of package you want to create (deb, rpm, etc)')
+
         return p
 
 
@@ -100,14 +115,15 @@ def build_from_python_source_with_wheel(
             return 1
 
 
-def write_requirements_txt(directory, pinned_requirements, specs_requirements):
+def write_requirements_txt(
+        directory, pinned_requirements, specs_requirements, pin_mark="=="):
     requirements_txt = os.path.join(directory, "requirements.txt")
     result = []
     for package, version in pinned_requirements.items():
         if package in specs_requirements:
             result.append(specs_requirements[package])
         else:
-            result.append("%s==%s" % (package, version))
+            result.append("%s%s%s" % (package, pin_mark, version))
     with open(requirements_txt, "wb") as f:
         f.write("\n".join(result))
 
@@ -125,10 +141,9 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                     install_dir, deb_dir)
 
     def build_package(self, version, args, extra_args):
-        if self.args.pin_versions and self.downloaded_req_set is not None:
+        if self.args.pin_versions:
             # we want the exact versions from our downloaded requirement_set
-            # and put it in the debian control file, so let's write a
-            # requirements.txt file and say to FPM to use it
+            # so let's create a requirements.txt file and say to FPM to use it
             downloaded_requirements = \
                 self.downloaded_req_set.requirement_versions()
 
@@ -143,7 +158,8 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                 x.project_name: x.__str__() for x in package_requirements if x.specs}  # noqa
 
             write_requirements_txt(
-                self.directory, downloaded_requirements, specs_requirements)
+                self.directory, downloaded_requirements, specs_requirements,
+                PIN_MARKS[self.args.pin_versions])
 
             extra_args.append("--python-obey-requirements-txt")
 
