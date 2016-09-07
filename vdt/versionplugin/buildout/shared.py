@@ -128,6 +128,12 @@ def write_requirements_txt(
         f.write("\n".join(result))
 
 
+def delete_requirements_txt(directory):
+    requirements_txt = os.path.join(directory, "requirements.txt")
+    if os.path.exists(requirements_txt):
+        os.remove(requirements_txt)
+
+
 class PinnedVersionPackageBuilder(PackageBuilder):
     def download_dependencies(self, install_dir, deb_dir):
         versions = lookup_versions(self.args.versions_file)
@@ -165,6 +171,10 @@ class PinnedVersionPackageBuilder(PackageBuilder):
 
         super(PinnedVersionPackageBuilder, self).build_package(
             version, args, extra_args)
+
+        if self.args.pin_versions:
+            # cleanup
+            delete_requirements_txt(self.directory)
 
     def build_dependency(self, args, extra_args, path, package_dir, deb_dir, glob_pattern=None, dependency_builder=None):
         if args.target == 'wheel':
