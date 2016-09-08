@@ -96,9 +96,10 @@ class PinnedRequirementSet(RequirementSet):
             # when comes_from is not set it is a dependency to ourselves. So
             # skip that
             if install_req.comes_from:
-                versions[install_req.name] = ""
-                if install_req.req.specs:
+                try:
                     versions[install_req.name] = install_req.req.specs[0][1]
+                except IndexError:
+                    versions[install_req.name] = ""
         return versions
 
 
