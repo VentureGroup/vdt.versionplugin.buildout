@@ -52,6 +52,9 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
             '--target', '-t', default='deb',
             choices=PACKAGE_TYPE_CHOICES + ["wheel"],
             help='the type of package you want to create (deb, rpm, etc)')
+        p.add_argument(
+            '--pip-binary', '-p', default='pip',
+            help='the complete path of the pip binary to use')
 
         return p
 
@@ -108,7 +111,9 @@ def build_from_python_source_with_wheel(
     target_wheel_dir = os.path.join(os.getcwd(), 'dist')
     with change_directory(target_path):
         try:
-            cmd = ['pip', 'wheel', '.', '--no-deps', '--wheel-dir', target_wheel_dir]  # noqa
+            cmd = [
+                args.pip_binary, 'wheel', '.', '--no-deps', '--wheel-dir',
+                target_wheel_dir]
             log.debug("Running command {0}".format(" ".join(cmd)))
             log.debug(subprocess.check_output(cmd, cwd=target_path))
         except subprocess.CalledProcessError as e:
