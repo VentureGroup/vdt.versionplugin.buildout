@@ -96,7 +96,10 @@ class PinnedRequirementSet(RequirementSet):
             # when comes_from is not set it is a dependency to ourselves. So
             # skip that
             if install_req.comes_from:
-                versions[install_req.name] = install_req.req.specs[0][1]
+                try:
+                    versions[install_req.name] = install_req.req.specs[0][1]
+                except IndexError:
+                    versions[install_req.name] = ""
         return versions
 
 
@@ -123,7 +126,10 @@ def write_requirements_txt(
         if package in specs_requirements:
             result.append(specs_requirements[package])
         else:
-            result.append("%s%s%s" % (package, pin_mark, version))
+            if version:
+                result.append("%s%s%s" % (package, pin_mark, version))
+            else:
+                result.append(package)
     with open(requirements_txt, "wb") as f:
         f.write("\n".join(result))
 
