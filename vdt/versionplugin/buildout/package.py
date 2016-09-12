@@ -1,45 +1,48 @@
 import logging
-import subprocess
-import os
+from os.path import basename
+from os import getcwd
 
-from vdt.versionplugin.buildout.shared import parse_version_extra_args
-from vdt.versionplugin.buildout.shared import read_dependencies_setup_py
-from vdt.versionplugin.buildout.shared import lookup_versions
-from vdt.versionplugin.buildout.shared import create_fpm_extra_args
-from vdt.versionplugin.buildout.shared import fpm_command
-from vdt.versionplugin.buildout.shared import delete_old_packages
-from vdt.versionplugin.buildout.shared import traverse_dependencies
-from vdt.versionplugin.buildout.shared import fix_dependencies
-from vdt.versionplugin.buildout.shared import build_bdist
-from vdt.versionplugin.buildout.shared import download_bdist_dependencies
+from vdt.versionplugin.buildout.shared import (
+    parse_version_extra_args,
+    PinnedVersionPackageBuilder,
+    delete_old_packages
+)
 
-log = logging.getLogger('vdt.versionplugin.buildout.package')
+from vdt.versionplugin.wheel.package import build_package as build_wheel
+
+log = logging.getLogger(__name__)
 
 
 def build_package(version):
     """
     Build package with debianize.
     """
-    delete_old_packages()
     args, extra_args = parse_version_extra_args(version.extra_args)
-    deps = read_dependencies_setup_py(os.path.join(os.getcwd(), 'setup.py'))
-    deps_with_versions = lookup_versions(deps, args.versions_file)
-    traverse_dependencies(deps_with_versions, args.versions_file)
-    if args.bdist:
-        download_bdist_dependencies(deps_with_versions)
-        build_bdist()
-    deps_with_versions = fix_dependencies(deps_with_versions)
-    extra_args = create_fpm_extra_args(deps_with_versions, extra_args)
 
-    log.debug("Building {0} version {1} with "
-              "vdt.versionplugin.buildout".format(os.path.basename(os.getcwd()), version))
+    delete_old_packages()
+
     with version.checkout_tag:
-        fpm_cmd = fpm_command(os.path.basename(os.getcwd()), 'setup.py',
-                              no_python_dependencies=True, extra_args=extra_args, version=version,
-                              iteration=args.iteration)
+        deb_dir = getcwd()
 
-        log.debug("Running command {0}".format(" ".join(fpm_cmd)))
-        log.debug(subprocess.check_output(fpm_cmd))
+        if args.iteration is not None:
+            version_string = "%s.%s" % (version, args.iteration)
+        else:
+            version_string = str(version)
+
+        log.debug(
+            "Building {0} version {1} with "
+            "vdt.versionplugin.buildout".format(
+                basename(deb_dir), version_string))
+
+        # use a package build class which has all kinds of hooks.
+        builder = PinnedVersionPackageBuilder(version_string, args, extra_args, deb_dir)
+        exit_code = 0
+        if args.target == 'wheel':
+            exit_code = build_wheel(version)
+            builder.build_dependencies(version, args, extra_args, deb_dir)
+        else:
+            builder.build_package_and_dependencies()
+        return builder.exit_code or exit_code
 
     return 0
 
