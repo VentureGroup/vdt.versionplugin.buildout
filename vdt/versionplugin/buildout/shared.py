@@ -123,7 +123,7 @@ def build_from_python_source_with_wheel(
 
         # move wheels to correct directory
         for wheel in glob.glob(os.path.join(target_path, 'dist', '*.whl')):
-            shutil.move(wheel, target_wheel_dir)
+            shutil.copy(wheel, target_wheel_dir)
 
 
 def write_requirements_txt(
