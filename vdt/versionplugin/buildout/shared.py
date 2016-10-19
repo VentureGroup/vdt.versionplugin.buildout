@@ -111,9 +111,12 @@ def build_from_python_source_with_wheel(
             # context (pip wheel uses sys.executable as python
             # interpeter). So calling it ourselves like this makes sure
             # we use the correct interpreter, using buildout or virtualenv
+            build_env = os.environ.copy()
+            build_env['PYTHONPATH'] = target_path
             cmd = ['python', 'setup.py', 'bdist_wheel']
             log.debug("Running command {0}".format(" ".join(cmd)))
-            log.debug(subprocess.check_output(cmd, cwd=target_path))
+            log.debug(subprocess.check_output(
+                cmd, cwd=target_path, env=build_env))
 
         except subprocess.CalledProcessError as e:
             log.error("failed to build with wheel status code %s\n%s" % (
