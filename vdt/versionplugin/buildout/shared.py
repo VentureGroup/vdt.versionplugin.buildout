@@ -106,6 +106,11 @@ def build_from_python_source_with_wheel(
     target_wheel_dir = os.path.join(os.getcwd(), 'dist')
     with change_directory(target_path):
         try:
+            # The 'pip wheel' command is using subprocess to call
+            # 'setup.py bdist_wheel'. This sucks as we loose the complete
+            # context (pip wheel uses sys.executable as python
+            # interpeter). So calling it ourselves like this makes sure
+            # we use the correct interpreter, using buildout or virtualenv
             cmd = ['python', 'setup.py', 'bdist_wheel']
             log.debug("Running command {0}".format(" ".join(cmd)))
             log.debug(subprocess.check_output(cmd, cwd=target_path))
@@ -117,8 +122,8 @@ def build_from_python_source_with_wheel(
             return 1
 
         # move wheels to correct directory
-        for file in glob.glob(os.path.join(target_path, 'dist', '*.whl')):
-            shutil.move(file, target_wheel_dir)
+        for wheel in glob.glob(os.path.join(target_path, 'dist', '*.whl')):
+            shutil.move(wheel, target_wheel_dir)
 
 
 def write_requirements_txt(
