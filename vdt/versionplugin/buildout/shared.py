@@ -1,23 +1,21 @@
-import os
-import functools
-import logging
-import glob
 import ConfigParser
+import functools
+import glob
+import logging
+import os
+import shutil
 import subprocess
-import setupreader
 
 import mock
-from pip.req import RequirementSet
 from pip._vendor import pkg_resources
+from pip.req import RequirementSet
+
+import setupreader
 
 from vdt.version.utils import change_directory
-from vdt.versionplugin.debianize.shared import (
-    PackageBuilder,
-    DebianizeArgumentParser
-)
-
 from vdt.versionplugin.debianize.config import PACKAGE_TYPE_CHOICES
-
+from vdt.versionplugin.debianize.shared import (
+    DebianizeArgumentParser, PackageBuilder)
 
 PIN_MARKS = {
     'equal': "==",
@@ -52,9 +50,6 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
             '--target', '-t', default='deb',
             choices=PACKAGE_TYPE_CHOICES + ["wheel"],
             help='the type of package you want to create (deb, rpm, etc)')
-        p.add_argument(
-            '--pip-binary', '-p', default='pip',
-            help='the complete path of the pip binary to use')
 
         return p
 
@@ -111,16 +106,19 @@ def build_from_python_source_with_wheel(
     target_wheel_dir = os.path.join(os.getcwd(), 'dist')
     with change_directory(target_path):
         try:
-            cmd = [
-                args.pip_binary, 'wheel', '.', '--no-deps', '--wheel-dir',
-                target_wheel_dir]
+            cmd = ['python', 'setup.py', 'bdist_wheel']
             log.debug("Running command {0}".format(" ".join(cmd)))
             log.debug(subprocess.check_output(cmd, cwd=target_path))
+
         except subprocess.CalledProcessError as e:
             log.error("failed to build with wheel status code %s\n%s" % (
                 e.returncode, e.output
             ))
             return 1
+
+        # move wheels to correct directory
+        for file in glob.glob(os.path.join(target_path, 'dist', '*.whl')):
+            shutil.move(file, target_wheel_dir)
 
 
 def write_requirements_txt(
@@ -179,7 +177,6 @@ class PinnedVersionPackageBuilder(PackageBuilder):
                 PIN_MARKS[self.args.pin_versions])
 
             extra_args.append("--python-obey-requirements-txt")
-
             super(PinnedVersionPackageBuilder, self).build_package(
                 version, args, extra_args)
         finally:
