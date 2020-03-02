@@ -2,7 +2,7 @@ import os
 import functools
 import logging
 import glob
-import ConfigParser
+import configparser
 import subprocess
 import setupreader
 
@@ -72,7 +72,7 @@ def parse_version_extra_args(version_args):
 
 
 def lookup_versions(versions_file):
-    versions_config = ConfigParser.ConfigParser()
+    versions_config = configparser.ConfigParser()
     versions_config.read(versions_file)
     return dict(versions_config.items('versions'))
 
@@ -95,7 +95,7 @@ class PinnedRequirementSet(RequirementSet):
 
     def requirement_versions(self):
         versions = {}
-        for install_req in self.requirements.values():
+        for install_req in list(self.requirements.values()):
             # when comes_from is not set it is a dependency to ourselves. So
             # skip that
             if install_req.comes_from:
@@ -127,7 +127,7 @@ def write_requirements_txt(
         directory, pinned_requirements, specs_requirements, pin_mark="=="):
     requirements_txt = os.path.join(directory, "requirements.txt")
     result = []
-    for package, version in pinned_requirements.items():
+    for package, version in list(pinned_requirements.items()):
         if package in specs_requirements:
             result.append(specs_requirements[package])
         else:
