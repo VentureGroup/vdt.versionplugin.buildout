@@ -50,7 +50,7 @@ class BuildoutArgumentParser(DebianizeArgumentParser):
         # override this so we accept wheels
         p.add_argument(
             '--target', '-t', default='deb',
-            choices=PACKAGE_TYPE_CHOICES + ["wheel"],
+            choices=list(PACKAGE_TYPE_CHOICES) + ["wheel"],
             help='the type of package you want to create (deb, rpm, etc)')
         p.add_argument(
             '--pip-binary', '-p', default='pip',
